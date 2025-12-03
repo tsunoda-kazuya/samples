@@ -4753,14 +4753,28 @@ function startGame() {
     if (gameStarted) return;
     gameStarted = true;
 
-    // Initialize audio (requires user interaction)
+    // Initialize audio (requires user interaction on iOS)
     initAudio();
 
     // Hide start screen
     document.getElementById('startScreen').style.display = 'none';
 
-    // Start BGM
-    startBGM();
+    // Start BGM if not already playing (may have started from title screen)
+    setTimeout(() => {
+        if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume().then(() => {
+                // Only start if not already playing
+                if (!bgmGenerator || !bgmGenerator.isPlaying) {
+                    startBGM();
+                }
+            });
+        } else {
+            // Only start if not already playing
+            if (!bgmGenerator || !bgmGenerator.isPlaying) {
+                startBGM();
+            }
+        }
+    }, 100);
 }
 
 // Initialize

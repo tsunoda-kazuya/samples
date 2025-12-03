@@ -483,8 +483,9 @@
             }
         }
 
-        // D-Pad touch handling
+        // D-Pad touch handling with slide support
         function setupDPad() {
+            const dpad = document.getElementById('dpad');
             const dpadButtons = {
                 'dpad-up': 'up',
                 'dpad-down': 'down',
@@ -492,29 +493,110 @@
                 'dpad-right': 'right'
             };
 
+            // Get button elements and their bounds
+            const buttons = {};
             Object.entries(dpadButtons).forEach(([id, direction]) => {
-                const btn = document.getElementById(id);
-                if (!btn) return;
+                buttons[direction] = document.getElementById(id);
+            });
 
-                btn.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    touchState[direction] = true;
-                    btn.classList.add('active');
-                    updateKeysFromTouch();
-                }, { passive: false });
-
-                btn.addEventListener('touchend', (e) => {
-                    e.preventDefault();
-                    touchState[direction] = false;
-                    btn.classList.remove('active');
-                    updateKeysFromTouch();
-                }, { passive: false });
-
-                btn.addEventListener('touchcancel', (e) => {
-                    touchState[direction] = false;
-                    btn.classList.remove('active');
-                    updateKeysFromTouch();
+            // Clear all D-pad states
+            function clearDpadState() {
+                touchState.up = false;
+                touchState.down = false;
+                touchState.left = false;
+                touchState.right = false;
+                Object.values(buttons).forEach(btn => {
+                    if (btn) btn.classList.remove('active');
                 });
+            }
+
+            // Update D-pad based on touch position
+            function updateDpadFromTouch(touch) {
+                const dpadRect = dpad.getBoundingClientRect();
+                const x = touch.clientX - dpadRect.left;
+                const y = touch.clientY - dpadRect.top;
+
+                // D-pad is 150x150, each button is 50x50
+                // Center is at 75,75
+                const centerX = 75;
+                const centerY = 75;
+                const dx = x - centerX;
+                const dy = y - centerY;
+
+                // Clear previous state
+                clearDpadState();
+
+                // Determine direction based on position
+                // Use a dead zone in the center (25px radius)
+                const deadZone = 20;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < deadZone) {
+                    // In dead zone, no direction
+                    updateKeysFromTouch();
+                    return;
+                }
+
+                // Determine primary direction
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    // Horizontal
+                    if (dx > 0) {
+                        touchState.right = true;
+                        if (buttons.right) buttons.right.classList.add('active');
+                    } else {
+                        touchState.left = true;
+                        if (buttons.left) buttons.left.classList.add('active');
+                    }
+                } else {
+                    // Vertical
+                    if (dy > 0) {
+                        touchState.down = true;
+                        if (buttons.down) buttons.down.classList.add('active');
+                    } else {
+                        touchState.up = true;
+                        if (buttons.up) buttons.up.classList.add('active');
+                    }
+                }
+
+                updateKeysFromTouch();
+            }
+
+            // Track active touches on D-pad
+            let activeDpadTouchId = null;
+
+            dpad.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (activeDpadTouchId === null) {
+                    activeDpadTouchId = e.changedTouches[0].identifier;
+                    updateDpadFromTouch(e.changedTouches[0]);
+                }
+            }, { passive: false });
+
+            dpad.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === activeDpadTouchId) {
+                        updateDpadFromTouch(e.changedTouches[i]);
+                        break;
+                    }
+                }
+            }, { passive: false });
+
+            dpad.addEventListener('touchend', (e) => {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === activeDpadTouchId) {
+                        activeDpadTouchId = null;
+                        clearDpadState();
+                        updateKeysFromTouch();
+                        break;
+                    }
+                }
+            }, { passive: false });
+
+            dpad.addEventListener('touchcancel', (e) => {
+                activeDpadTouchId = null;
+                clearDpadState();
+                updateKeysFromTouch();
             });
         }
 
@@ -607,6 +689,65 @@
         // Initialize touch controls
         setupDPad();
         setupActionButtons();
+
+        // ===============================
+        // MOBILE AUDIO FIX
+        // ===============================
+        // iOS requires audio to be unlocked on first user touch
+        let audioUnlocked = false;
+        let titleBgmStarted = false;
+
+        function unlockAudioAndPlayBGM() {
+            // Try to initialize audio
+            if (typeof initAudio === 'function') {
+                initAudio();
+            }
+
+            // Also try to resume any existing context and start BGM
+            if (typeof audioContext !== 'undefined' && audioContext) {
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume().then(() => {
+                        console.log('Audio context resumed successfully');
+                        // Start title screen BGM after unlock
+                        if (!titleBgmStarted && typeof startBGM === 'function') {
+                            setTimeout(() => {
+                                startBGM();
+                                titleBgmStarted = true;
+                            }, 100);
+                        }
+                    }).catch(e => {
+                        console.log('Audio resume failed:', e);
+                    });
+                } else {
+                    // Already running, start BGM
+                    if (!titleBgmStarted && typeof startBGM === 'function') {
+                        startBGM();
+                        titleBgmStarted = true;
+                    }
+                }
+            }
+
+            audioUnlocked = true;
+            console.log('Audio unlock attempted');
+        }
+
+        // Unlock audio on first touch anywhere
+        document.addEventListener('touchstart', unlockAudioAndPlayBGM, { once: true });
+        document.addEventListener('touchend', unlockAudioAndPlayBGM, { once: true });
+        document.addEventListener('click', unlockAudioAndPlayBGM, { once: true });
+
+        // Also unlock on start screen tap
+        const startScreen = document.getElementById('startScreen');
+        if (startScreen) {
+            startScreen.addEventListener('touchstart', unlockAudioAndPlayBGM);
+            startScreen.addEventListener('click', unlockAudioAndPlayBGM);
+        }
+
+        // Unlock on start button click
+        const startBtn = startScreen ? startScreen.querySelector('button') : null;
+        if (startBtn) {
+            startBtn.addEventListener('touchstart', unlockAudioAndPlayBGM);
+        }
 
         // Prevent zoom on double tap
         let lastTouchEnd = 0;
