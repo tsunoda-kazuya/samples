@@ -3,7 +3,7 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 // ===============================
-// SOUND SYSTEM (iOS Compatible)
+// SOUND SYSTEM (iOS Compatible with HTML5 Audio fallback)
 // ===============================
 let audioContext = null;
 let soundEnabled = true;
@@ -12,48 +12,99 @@ let bgmSource = null;
 let bgmGainNode = null;
 let audioUnlocked = false;
 
+// HTML5 Audio element for iOS fallback
+let html5Audio = null;
+let useHTML5Audio = false;
+let forceHTML5OnIOS = true; // Use HTML5 Audio on iOS by default
+
+// Detect iOS
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+// On iOS, prefer HTML5 Audio as it's more reliable
+if (isIOS && forceHTML5OnIOS) {
+    useHTML5Audio = true;
+    console.log('iOS detected - using HTML5 Audio');
+}
+
 // iOS Audio Unlock - Must be called synchronously within user event handler
 function unlockAudioContext() {
     if (audioUnlocked) return;
+
+    console.log('Attempting audio unlock, iOS:', isIOS);
 
     try {
         // Create context if needed
         if (!audioContext) {
             const AudioContextClass = window.AudioContext || window.webkitAudioContext;
             if (!AudioContextClass) {
-                console.warn('Web Audio API not supported');
+                console.warn('Web Audio API not supported, using HTML5 Audio');
+                useHTML5Audio = true;
+                audioUnlocked = true;
                 return;
             }
             audioContext = new AudioContextClass();
+            console.log('AudioContext created, initial state:', audioContext.state);
         }
 
         // CRITICAL: resume() must be called synchronously in the event handler
-        // Not inside a Promise or setTimeout
         if (audioContext.state === 'suspended') {
-            audioContext.resume();
+            // Call resume synchronously
+            const resumePromise = audioContext.resume();
+            console.log('Called audioContext.resume()');
+
+            // Also check after a moment
+            if (resumePromise) {
+                resumePromise.then(() => {
+                    console.log('AudioContext resume promise resolved, state:', audioContext.state);
+                }).catch(e => {
+                    console.log('Resume promise rejected:', e);
+                });
+            }
         }
 
         // Play silent buffer to fully unlock on iOS
-        const buffer = audioContext.createBuffer(1, 1, 22050);
-        const source = audioContext.createBufferSource();
-        source.buffer = buffer;
-        source.connect(audioContext.destination);
-        source.start(0);
-        source.stop(audioContext.currentTime + 0.001);
+        try {
+            const buffer = audioContext.createBuffer(1, 1, 22050);
+            const source = audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioContext.destination);
+            source.start(0);
+        } catch (e) {
+            console.log('Silent buffer failed:', e);
+        }
 
-        // Also create and play an oscillator (more reliable on some iOS versions)
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        gainNode.gain.value = 0; // Silent
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        oscillator.start(0);
-        oscillator.stop(audioContext.currentTime + 0.001);
+        // Also create and play an oscillator
+        try {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            gainNode.gain.value = 0.001; // Nearly silent but not zero
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            oscillator.start(0);
+            oscillator.stop(audioContext.currentTime + 0.1);
+        } catch (e) {
+            console.log('Oscillator failed:', e);
+        }
 
         audioUnlocked = true;
-        console.log('Audio unlocked successfully, state:', audioContext.state);
+        console.log('Audio unlock completed, state:', audioContext.state);
+
+        // Check state after unlock attempts
+        setTimeout(() => {
+            if (audioContext) {
+                console.log('AudioContext state after 100ms:', audioContext.state);
+                if (audioContext.state !== 'running') {
+                    console.log('AudioContext not running, trying resume again');
+                    audioContext.resume();
+                }
+            }
+        }, 100);
+
     } catch (e) {
         console.error('Audio unlock failed:', e);
+        useHTML5Audio = true;
+        audioUnlocked = true;
     }
 }
 
@@ -64,7 +115,8 @@ function initAudio() {
 
 // Check if audio is ready to play
 function isAudioReady() {
-    return audioContext && audioContext.state === 'running';
+    if (useHTML5Audio) return true;
+    return audioContext && (audioContext.state === 'running' || audioContext.state === 'suspended');
 }
 
 // Generate retro-style sound effects using Web Audio API
@@ -632,17 +684,211 @@ class StarBGMGenerator {
 let starBgmGenerator = null;
 let isStarMusicPlaying = false;
 
+// ===============================
+// HTML5 AUDIO BGM FOR iOS
+// ===============================
+class HTML5AudioBGM {
+    constructor() {
+        this.isPlaying = false;
+        this.audio = null;
+        this.audioData = null;
+        this.tempo = 140;
+        this.createAudioData();
+    }
+
+    createAudioData() {
+        // Generate a short looping WAV file using offline AudioContext
+        const sampleRate = 22050;
+        const duration = 4.5; // seconds for one loop
+        const numSamples = Math.floor(sampleRate * duration);
+
+        // Mario melody frequencies
+        const melody = [
+            660, 660, 0, 660, 0, 523, 660, 0, 784, 0, 0, 0, 392, 0, 0, 0,
+            523, 0, 0, 392, 0, 0, 330, 0, 0, 440, 0, 494, 0, 466, 440, 0,
+            392, 660, 784, 880, 0, 698, 784, 0, 660, 0, 523, 587, 494, 0, 0, 0
+        ];
+
+        const bass = [
+            131, 0, 131, 0, 131, 0, 131, 0, 165, 0, 165, 0, 165, 0, 165, 0,
+            131, 0, 131, 0, 131, 0, 131, 0, 98, 0, 98, 0, 98, 0, 98, 0,
+            131, 0, 131, 0, 175, 0, 175, 0, 165, 0, 165, 0, 131, 0, 131, 0
+        ];
+
+        // Generate raw samples
+        const samples = new Float32Array(numSamples);
+        const noteDuration = 60 / this.tempo / 2;
+        const samplesPerNote = Math.floor(sampleRate * noteDuration);
+
+        for (let i = 0; i < numSamples; i++) {
+            const noteIndex = Math.floor(i / samplesPerNote);
+            const noteTime = (i % samplesPerNote) / sampleRate;
+
+            // Melody
+            const melodyFreq = melody[noteIndex % melody.length];
+            let sample = 0;
+            if (melodyFreq > 0) {
+                const envelope = Math.max(0, 1 - noteTime / (noteDuration * 0.9));
+                sample += Math.sign(Math.sin(2 * Math.PI * melodyFreq * i / sampleRate)) * 0.1 * envelope;
+            }
+
+            // Bass
+            const bassFreq = bass[noteIndex % bass.length];
+            if (bassFreq > 0) {
+                const envelope = Math.max(0, 1 - noteTime / (noteDuration * 0.9));
+                sample += Math.sin(2 * Math.PI * bassFreq * i / sampleRate) * 0.15 * envelope;
+            }
+
+            samples[i] = sample;
+        }
+
+        // Convert to 16-bit PCM WAV
+        const buffer = new ArrayBuffer(44 + numSamples * 2);
+        const view = new DataView(buffer);
+
+        // WAV header
+        const writeString = (offset, str) => {
+            for (let i = 0; i < str.length; i++) {
+                view.setUint8(offset + i, str.charCodeAt(i));
+            }
+        };
+
+        writeString(0, 'RIFF');
+        view.setUint32(4, 36 + numSamples * 2, true);
+        writeString(8, 'WAVE');
+        writeString(12, 'fmt ');
+        view.setUint32(16, 16, true); // fmt chunk size
+        view.setUint16(20, 1, true); // PCM format
+        view.setUint16(22, 1, true); // mono
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true); // byte rate
+        view.setUint16(32, 2, true); // block align
+        view.setUint16(34, 16, true); // bits per sample
+        writeString(36, 'data');
+        view.setUint32(40, numSamples * 2, true);
+
+        // Write samples
+        for (let i = 0; i < numSamples; i++) {
+            const sample = Math.max(-1, Math.min(1, samples[i]));
+            view.setInt16(44 + i * 2, sample * 32767, true);
+        }
+
+        // Convert to base64
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        this.audioData = 'data:audio/wav;base64,' + btoa(binary);
+    }
+
+    start() {
+        if (this.isPlaying || !soundEnabled) return;
+
+        console.log('HTML5AudioBGM: Starting...');
+
+        if (!this.audio) {
+            this.audio = new Audio();
+            this.audio.loop = true;
+            this.audio.volume = 0.5;
+        }
+
+        this.audio.src = this.audioData;
+
+        const playPromise = this.audio.play();
+        if (playPromise !== undefined) {
+            playPromise.then(() => {
+                console.log('HTML5AudioBGM: Playing successfully');
+                this.isPlaying = true;
+            }).catch(e => {
+                console.log('HTML5AudioBGM: Play failed:', e.message);
+            });
+        }
+
+        this.isPlaying = true;
+    }
+
+    stop() {
+        if (this.audio) {
+            this.audio.pause();
+            this.audio.currentTime = 0;
+        }
+        this.isPlaying = false;
+    }
+}
+
+// Make html5BgmGenerator globally accessible for iOS audio unlock
+window.html5BgmGenerator = null;
+
 function startBGM() {
-    if (!audioContext || !soundEnabled) return;
+    if (!soundEnabled) return;
+
+    console.log('startBGM called, useHTML5Audio:', useHTML5Audio);
+
+    // Use HTML5 Audio on iOS (more reliable)
+    if (useHTML5Audio) {
+        if (!window.html5BgmGenerator) {
+            window.html5BgmGenerator = new HTML5AudioBGM();
+        }
+        if (!window.html5BgmGenerator.isPlaying) {
+            window.html5BgmGenerator.start();
+        }
+        return;
+    }
+
+    // Web Audio API path
+    if (!audioContext) {
+        console.log('startBGM: No audioContext, attempting unlock');
+        unlockAudioContext();
+    }
+
+    if (!audioContext) {
+        console.log('startBGM: Still no audioContext after unlock, falling back to HTML5');
+        useHTML5Audio = true;
+        startBGM();
+        return;
+    }
+
+    // Resume if suspended
+    if (audioContext.state === 'suspended') {
+        console.log('startBGM: Context suspended, resuming...');
+        audioContext.resume().then(() => {
+            console.log('startBGM: Context resumed, state:', audioContext.state);
+            actuallyStartBGM();
+        }).catch(e => {
+            console.log('startBGM: Resume failed, falling back to HTML5:', e);
+            useHTML5Audio = true;
+            startBGM();
+        });
+    } else {
+        actuallyStartBGM();
+    }
+}
+
+function actuallyStartBGM() {
+    if (!audioContext || audioContext.state !== 'running') {
+        console.log('actuallyStartBGM: Context not running, falling back to HTML5');
+        useHTML5Audio = true;
+        startBGM();
+        return;
+    }
+
     if (!bgmGenerator) {
         bgmGenerator = new BGMGenerator();
     }
-    bgmGenerator.start();
+
+    if (!bgmGenerator.isPlaying) {
+        console.log('Starting Web Audio BGM playback');
+        bgmGenerator.start();
+    }
 }
 
 function stopBGM() {
     if (bgmGenerator) {
         bgmGenerator.stop();
+    }
+    if (window.html5BgmGenerator) {
+        window.html5BgmGenerator.stop();
     }
 }
 
@@ -1458,14 +1704,9 @@ class Mario {
         }
 
         // Horizontal movement (slower when crouching, faster when dashing)
-        let moveSpeed = this.isCrouching ? 0.2 : 0.5;
-        let currentMaxSpeed = MAX_SPEED;
-
-        // Dash increases speed
-        if (keys.dash && !this.isCrouching) {
-            moveSpeed = 0.8;
-            currentMaxSpeed = MAX_SPEED * 1.5;
-        }
+        const isDashing = keys.dash && !this.isCrouching;
+        let moveSpeed = this.isCrouching ? 0.2 : (isDashing ? 1.0 : 0.5);
+        let currentMaxSpeed = isDashing ? 8 : MAX_SPEED;
 
         if (keys.left && !this.isCrouching) {
             this.vx -= moveSpeed;
@@ -1476,9 +1717,12 @@ class Mario {
             this.facing = 1;
         }
 
-        // Apply friction (more friction when crouching)
+        // Apply friction (less friction when dashing for more speed)
         if (!keys.left && !keys.right || this.isCrouching) {
             this.vx *= this.isCrouching ? 0.8 : FRICTION;
+        } else if (isDashing) {
+            // Less friction when dashing
+            this.vx *= 0.98;
         }
 
         // Clamp speed (higher max when dashing)

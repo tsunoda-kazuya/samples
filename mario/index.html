@@ -601,84 +601,103 @@
             });
         }
 
-        // Action buttons touch handling
+        // Action buttons touch handling with MULTI-TOUCH support
         // A = Jump, B = Dash (hold), Y = Fire
         function setupActionButtons() {
-            // A Button - Jump
             const btnA = document.getElementById('btn-a');
-            if (btnA) {
-                btnA.addEventListener('touchstart', (e) => {
-                    e.stopPropagation(); // Don't interfere with other buttons
-                    touchState.jump = true;
-                    btnA.classList.add('active');
-                    updateKeysFromTouch();
-                }, { passive: true });
-
-                btnA.addEventListener('touchend', (e) => {
-                    touchState.jump = false;
-                    btnA.classList.remove('active');
-                    updateKeysFromTouch();
-                }, { passive: true });
-
-                btnA.addEventListener('touchcancel', (e) => {
-                    touchState.jump = false;
-                    btnA.classList.remove('active');
-                    updateKeysFromTouch();
-                });
-            }
-
-            // B Button - Dash (hold to run faster)
             const btnB = document.getElementById('btn-b');
-            if (btnB) {
-                btnB.addEventListener('touchstart', (e) => {
-                    e.stopPropagation();
-                    touchState.dash = true;
-                    btnB.classList.add('active');
-                    // Update dash state in game
-                    if (typeof keys !== 'undefined') {
-                        keys.dash = true;
-                    }
-                }, { passive: true });
-
-                btnB.addEventListener('touchend', (e) => {
-                    touchState.dash = false;
-                    btnB.classList.remove('active');
-                    if (typeof keys !== 'undefined') {
-                        keys.dash = false;
-                    }
-                }, { passive: true });
-
-                btnB.addEventListener('touchcancel', (e) => {
-                    touchState.dash = false;
-                    btnB.classList.remove('active');
-                    if (typeof keys !== 'undefined') {
-                        keys.dash = false;
-                    }
-                });
-            }
-
-            // Y Button - Fire
             const btnY = document.getElementById('btn-y');
-            if (btnY) {
-                btnY.addEventListener('touchstart', (e) => {
-                    e.stopPropagation();
-                    touchState.fire = true;
-                    btnY.classList.add('active');
-                    if (typeof mario !== 'undefined' && mario && !mario.isDead) {
-                        mario.shootFireball();
-                    }
-                }, { passive: true });
+            const actionButtons = document.getElementById('actionButtons');
 
-                btnY.addEventListener('touchend', (e) => {
-                    touchState.fire = false;
-                    btnY.classList.remove('active');
-                }, { passive: true });
+            // Track which touch IDs are on which buttons
+            const activeTouches = {
+                a: new Set(),
+                b: new Set(),
+                y: new Set()
+            };
 
-                btnY.addEventListener('touchcancel', (e) => {
-                    touchState.fire = false;
-                    btnY.classList.remove('active');
-                });
+            function getButtonFromPoint(x, y) {
+                const elements = document.elementsFromPoint(x, y);
+                for (const el of elements) {
+                    if (el.id === 'btn-a') return 'a';
+                    if (el.id === 'btn-b') return 'b';
+                    if (el.id === 'btn-y') return 'y';
+                }
+                return null;
             }
+
+            function updateButtonStates() {
+                // A button - Jump
+                const aPressed = activeTouches.a.size > 0;
+                touchState.jump = aPressed;
+                if (btnA) btnA.classList.toggle('active', aPressed);
+
+                // B button - Dash
+                const bPressed = activeTouches.b.size > 0;
+                touchState.dash = bPressed;
+                if (typeof keys !== 'undefined') {
+                    keys.dash = bPressed;
+                }
+                if (btnB) btnB.classList.toggle('active', bPressed);
+
+                // Y button - Fire
+                const yPressed = activeTouches.y.size > 0;
+                touchState.fire = yPressed;
+                if (btnY) btnY.classList.toggle('active', yPressed);
+
+                updateKeysFromTouch();
+            }
+
+            // Handle touch start on action buttons area
+            actionButtons.addEventListener('touchstart', (e) => {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touch = e.changedTouches[i];
+                    const btn = getButtonFromPoint(touch.clientX, touch.clientY);
+                    if (btn) {
+                        activeTouches[btn].add(touch.identifier);
+                        // Fire fireball on Y press
+                        if (btn === 'y' && typeof mario !== 'undefined' && mario && !mario.isDead) {
+                            mario.shootFireball();
+                        }
+                    }
+                }
+                updateButtonStates();
+            }, { passive: true });
+
+            // Handle touch end
+            actionButtons.addEventListener('touchend', (e) => {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touchId = e.changedTouches[i].identifier;
+                    activeTouches.a.delete(touchId);
+                    activeTouches.b.delete(touchId);
+                    activeTouches.y.delete(touchId);
+                }
+                updateButtonStates();
+            }, { passive: true });
+
+            // Handle touch cancel
+            actionButtons.addEventListener('touchcancel', (e) => {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touchId = e.changedTouches[i].identifier;
+                    activeTouches.a.delete(touchId);
+                    activeTouches.b.delete(touchId);
+                    activeTouches.y.delete(touchId);
+                }
+                updateButtonStates();
+            }, { passive: true });
+
+            // Also listen on document for touches that end outside buttons
+            document.addEventListener('touchend', (e) => {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touchId = e.changedTouches[i].identifier;
+                    if (activeTouches.a.has(touchId) || activeTouches.b.has(touchId) || activeTouches.y.has(touchId)) {
+                        activeTouches.a.delete(touchId);
+                        activeTouches.b.delete(touchId);
+                        activeTouches.y.delete(touchId);
+                        updateButtonStates();
+                    }
+                }
+            }, { passive: true });
         }
 
         // Pause functionality
@@ -697,76 +716,101 @@
         setupActionButtons();
 
         // ===============================
-        // iOS AUDIO FIX (Robust Implementation)
+        // iOS AUDIO FIX (HTML5 Audio approach)
         // ===============================
-        // iOS Safari requires audio unlock on touchend (not touchstart since iOS 9)
-        // The unlock must happen SYNCHRONOUSLY within the event handler
-        // Do NOT use Promise.then() or setTimeout() for the unlock itself
+        // iOS Safari requires audio play() to be called DIRECTLY in user event handler
+        // Cannot use setTimeout, Promise.then, or any async wrapper
 
-        let titleBgmStarted = false;
-        let unlockAttempts = 0;
+        let audioInitialized = false;
+        let iosUnlockAudio = null;  // Pre-created Audio element for iOS
 
-        // CRITICAL: This function must be called synchronously from event handler
-        function unlockAndPlayAudio() {
-            unlockAttempts++;
-            console.log('Audio unlock attempt #' + unlockAttempts);
+        // Pre-create the HTML5 Audio element on page load (but don't play yet)
+        function prepareIOSAudio() {
+            if (typeof isIOS !== 'undefined' && isIOS) {
+                console.log('Preparing iOS audio element...');
+                iosUnlockAudio = new Audio();
+                iosUnlockAudio.preload = 'auto';
+            }
+        }
 
-            // Step 1: Unlock audio context synchronously (MUST be synchronous)
+        // CRITICAL: Call this SYNCHRONOUSLY within touchend/click handler
+        function unlockAndPlayAudio(e) {
+            if (audioInitialized) return;
+
+            console.log('Audio unlock attempt via', e.type);
+
+            // For iOS: Create and play audio DIRECTLY in this handler
+            if (typeof isIOS !== 'undefined' && isIOS && typeof useHTML5Audio !== 'undefined') {
+                console.log('iOS detected, using HTML5 Audio directly');
+
+                // Create and play the BGM generator directly
+                if (typeof HTML5AudioBGM !== 'undefined') {
+                    if (!window.html5BgmGenerator) {
+                        window.html5BgmGenerator = new HTML5AudioBGM();
+                    }
+                    // CRITICAL: Call play() directly in this event handler
+                    if (window.html5BgmGenerator.audio) {
+                        window.html5BgmGenerator.audio.play().then(() => {
+                            console.log('iOS audio unlocked and playing!');
+                            window.html5BgmGenerator.isPlaying = true;
+                            audioInitialized = true;
+                        }).catch(err => {
+                            console.log('iOS audio play failed:', err.message);
+                        });
+                    } else {
+                        // Initialize the audio element
+                        window.html5BgmGenerator.audio = new Audio();
+                        window.html5BgmGenerator.audio.loop = true;
+                        window.html5BgmGenerator.audio.volume = 0.5;
+                        window.html5BgmGenerator.audio.src = window.html5BgmGenerator.audioData;
+                        window.html5BgmGenerator.audio.play().then(() => {
+                            console.log('iOS audio created and playing!');
+                            window.html5BgmGenerator.isPlaying = true;
+                            audioInitialized = true;
+                        }).catch(err => {
+                            console.log('iOS audio creation failed:', err.message);
+                        });
+                    }
+                }
+            }
+
+            // Also try Web Audio API unlock
             if (typeof unlockAudioContext === 'function') {
                 unlockAudioContext();
             }
 
-            // Step 2: Try to resume if still suspended
-            if (typeof audioContext !== 'undefined' && audioContext) {
-                // Synchronous resume attempt
-                if (audioContext.state === 'suspended') {
-                    audioContext.resume();
-                }
+            // Try to resume AudioContext
+            if (typeof audioContext !== 'undefined' && audioContext && audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
 
-                // Step 3: Start BGM if audio is running
-                // Use a small delay to let the context state update
-                setTimeout(() => {
-                    if (audioContext.state === 'running') {
-                        if (!titleBgmStarted && typeof startBGM === 'function') {
-                            startBGM();
-                            titleBgmStarted = true;
-                            console.log('BGM started successfully');
-                        }
-                    } else {
-                        console.log('AudioContext state:', audioContext.state);
-                    }
-                }, 50);
+            // Start BGM (will use appropriate method)
+            if (typeof startBGM === 'function' && !audioInitialized) {
+                startBGM();
+                audioInitialized = true;
             }
         }
 
-        // iOS requires touchend (not touchstart) since iOS 9
-        // We listen to multiple events and try multiple times
-        const audioUnlockEvents = ['touchend', 'touchstart', 'click', 'keydown'];
+        // Prepare iOS audio on load
+        prepareIOSAudio();
 
-        audioUnlockEvents.forEach(eventType => {
-            document.body.addEventListener(eventType, unlockAndPlayAudio, { passive: true });
+        // Listen for user interaction to unlock audio
+        // Use capturing phase and multiple event types for maximum compatibility
+        ['touchend', 'touchstart', 'click'].forEach(eventType => {
+            document.addEventListener(eventType, unlockAndPlayAudio, { capture: true, passive: true, once: false });
         });
 
-        // Special handling for start screen - higher priority
-        const startScreen = document.getElementById('startScreen');
-        const startBtn = startScreen ? startScreen.querySelector('button') : null;
-
-        if (startScreen) {
-            // Use capturing phase to get the event first
-            startScreen.addEventListener('touchend', unlockAndPlayAudio, { capture: true, passive: true });
-            startScreen.addEventListener('click', unlockAndPlayAudio, { capture: true, passive: true });
-        }
-
-        if (startBtn) {
-            startBtn.addEventListener('touchend', unlockAndPlayAudio, { capture: true, passive: true });
-            startBtn.addEventListener('click', unlockAndPlayAudio, { capture: true, passive: true });
-        }
-
-        // Also try on visibility change (when user returns to tab)
+        // Also try on visibility change
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible' && typeof audioContext !== 'undefined' && audioContext) {
-                if (audioContext.state === 'suspended') {
+            if (document.visibilityState === 'visible') {
+                if (typeof audioContext !== 'undefined' && audioContext && audioContext.state === 'suspended') {
                     audioContext.resume();
+                }
+                // Resume HTML5 audio if it was paused
+                if (window.html5BgmGenerator && window.html5BgmGenerator.audio) {
+                    if (window.html5BgmGenerator.audio.paused && window.html5BgmGenerator.isPlaying) {
+                        window.html5BgmGenerator.audio.play().catch(() => {});
+                    }
                 }
             }
         });
