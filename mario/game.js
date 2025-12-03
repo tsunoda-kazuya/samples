@@ -13,8 +13,33 @@ let bgmGainNode = null;
 
 // Initialize Audio Context (must be called after user interaction)
 function initAudio() {
-    if (audioContext) return;
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioContext) {
+        // Resume if suspended (required for iOS)
+        if (audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+        return;
+    }
+
+    try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        // iOS Safari requires resume after user gesture
+        if (audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+
+        // Create a silent buffer and play it to unlock audio on iOS
+        const silentBuffer = audioContext.createBuffer(1, 1, 22050);
+        const source = audioContext.createBufferSource();
+        source.buffer = silentBuffer;
+        source.connect(audioContext.destination);
+        source.start(0);
+
+        console.log('Audio initialized successfully');
+    } catch (e) {
+        console.error('Audio initialization failed:', e);
+    }
 }
 
 // Generate retro-style sound effects using Web Audio API
