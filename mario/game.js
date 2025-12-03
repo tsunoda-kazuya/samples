@@ -3,7 +3,7 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 // ===============================
-// SOUND SYSTEM (iOS Compatible with HTML5 Audio fallback)
+// SOUND SYSTEM (iOS Compatible)
 // ===============================
 let audioContext = null;
 let soundEnabled = true;
@@ -12,20 +12,114 @@ let bgmSource = null;
 let bgmGainNode = null;
 let audioUnlocked = false;
 
-// HTML5 Audio element for iOS fallback
-let html5Audio = null;
-let useHTML5Audio = false;
-let forceHTML5OnIOS = true; // Use HTML5 Audio on iOS by default
-
-// Detect iOS
+// Detect iOS/Safari
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-// On iOS, prefer HTML5 Audio as it's more reliable
-if (isIOS && forceHTML5OnIOS) {
-    useHTML5Audio = true;
-    console.log('iOS detected - using HTML5 Audio');
+console.log('Device detection - iOS:', isIOS, 'Safari:', isSafari);
+
+// Pre-generate BGM WAV data at load time (before any user interaction)
+let preGeneratedBGMData = null;
+
+function preGenerateBGMWav() {
+    const sampleRate = 22050;
+    const tempo = 140;
+
+    // Full Mario-style melody (80 notes) - matches BGMGenerator
+    const melody = [
+        660, 660, 0, 660, 0, 523, 660, 0, 784, 0, 0, 0, 392, 0, 0, 0,
+        523, 0, 0, 392, 0, 0, 330, 0, 0, 440, 0, 494, 0, 466, 440, 0,
+        392, 660, 784, 880, 0, 698, 784, 0, 660, 0, 523, 587, 494, 0, 0, 0,
+        523, 0, 0, 392, 0, 0, 330, 0, 0, 440, 0, 494, 0, 466, 440, 0,
+        392, 660, 784, 880, 0, 698, 784, 0, 660, 0, 523, 587, 494, 0, 0, 0
+    ];
+
+    // Full bass line (80 notes) - matches BGMGenerator
+    const bass = [
+        131, 0, 131, 0, 131, 0, 131, 0, 165, 0, 165, 0, 165, 0, 165, 0,
+        131, 0, 131, 0, 131, 0, 131, 0, 98, 0, 98, 0, 98, 0, 98, 0,
+        131, 0, 131, 0, 175, 0, 175, 0, 165, 0, 165, 0, 131, 0, 131, 0,
+        131, 0, 131, 0, 131, 0, 131, 0, 98, 0, 98, 0, 98, 0, 98, 0,
+        131, 0, 131, 0, 175, 0, 175, 0, 165, 0, 165, 0, 131, 0, 131, 0
+    ];
+
+    // Calculate exact duration based on melody length
+    // Each note is half a beat at the given tempo
+    const noteDuration = 60 / tempo / 2;  // seconds per note
+    const totalNotes = melody.length;
+    const duration = noteDuration * totalNotes;  // Exact duration for one full loop
+    const numSamples = Math.floor(sampleRate * duration);
+    const samplesPerNote = Math.floor(sampleRate * noteDuration);
+
+    console.log('BGM: tempo=' + tempo + ', notes=' + totalNotes + ', duration=' + duration.toFixed(2) + 's');
+
+    const samples = new Float32Array(numSamples);
+
+    for (let i = 0; i < numSamples; i++) {
+        const noteIndex = Math.floor(i / samplesPerNote);
+        const noteTime = (i % samplesPerNote) / sampleRate;
+
+        let sample = 0;
+        const melodyFreq = melody[noteIndex % melody.length];
+        if (melodyFreq > 0) {
+            const envelope = Math.max(0, 1 - noteTime / (noteDuration * 0.9));
+            sample += Math.sign(Math.sin(2 * Math.PI * melodyFreq * i / sampleRate)) * 0.1 * envelope;
+        }
+
+        const bassFreq = bass[noteIndex % bass.length];
+        if (bassFreq > 0) {
+            const envelope = Math.max(0, 1 - noteTime / (noteDuration * 0.9));
+            sample += Math.sin(2 * Math.PI * bassFreq * i / sampleRate) * 0.15 * envelope;
+        }
+
+        samples[i] = sample;
+    }
+
+    // Create WAV
+    const buffer = new ArrayBuffer(44 + numSamples * 2);
+    const view = new DataView(buffer);
+
+    const writeString = (offset, str) => {
+        for (let i = 0; i < str.length; i++) {
+            view.setUint8(offset + i, str.charCodeAt(i));
+        }
+    };
+
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + numSamples * 2, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, 'data');
+    view.setUint32(40, numSamples * 2, true);
+
+    for (let i = 0; i < numSamples; i++) {
+        const sample = Math.max(-1, Math.min(1, samples[i]));
+        view.setInt16(44 + i * 2, sample * 32767, true);
+    }
+
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    preGeneratedBGMData = 'data:audio/wav;base64,' + btoa(binary);
+    console.log('BGM WAV pre-generated, length:', preGeneratedBGMData.length);
 }
+
+// Generate WAV immediately on script load
+preGenerateBGMWav();
+
+// Global audio element for BGM (will be created on first user interaction)
+window.bgmAudioElement = null;
+window.bgmIsPlaying = false;
 
 // iOS Audio Unlock - Must be called synchronously within user event handler
 function unlockAudioContext() {
@@ -684,212 +778,73 @@ class StarBGMGenerator {
 let starBgmGenerator = null;
 let isStarMusicPlaying = false;
 
-// ===============================
-// HTML5 AUDIO BGM FOR iOS
-// ===============================
-class HTML5AudioBGM {
-    constructor() {
-        this.isPlaying = false;
-        this.audio = null;
-        this.audioData = null;
-        this.tempo = 140;
-        this.createAudioData();
-    }
-
-    createAudioData() {
-        // Generate a short looping WAV file using offline AudioContext
-        const sampleRate = 22050;
-        const duration = 4.5; // seconds for one loop
-        const numSamples = Math.floor(sampleRate * duration);
-
-        // Mario melody frequencies
-        const melody = [
-            660, 660, 0, 660, 0, 523, 660, 0, 784, 0, 0, 0, 392, 0, 0, 0,
-            523, 0, 0, 392, 0, 0, 330, 0, 0, 440, 0, 494, 0, 466, 440, 0,
-            392, 660, 784, 880, 0, 698, 784, 0, 660, 0, 523, 587, 494, 0, 0, 0
-        ];
-
-        const bass = [
-            131, 0, 131, 0, 131, 0, 131, 0, 165, 0, 165, 0, 165, 0, 165, 0,
-            131, 0, 131, 0, 131, 0, 131, 0, 98, 0, 98, 0, 98, 0, 98, 0,
-            131, 0, 131, 0, 175, 0, 175, 0, 165, 0, 165, 0, 131, 0, 131, 0
-        ];
-
-        // Generate raw samples
-        const samples = new Float32Array(numSamples);
-        const noteDuration = 60 / this.tempo / 2;
-        const samplesPerNote = Math.floor(sampleRate * noteDuration);
-
-        for (let i = 0; i < numSamples; i++) {
-            const noteIndex = Math.floor(i / samplesPerNote);
-            const noteTime = (i % samplesPerNote) / sampleRate;
-
-            // Melody
-            const melodyFreq = melody[noteIndex % melody.length];
-            let sample = 0;
-            if (melodyFreq > 0) {
-                const envelope = Math.max(0, 1 - noteTime / (noteDuration * 0.9));
-                sample += Math.sign(Math.sin(2 * Math.PI * melodyFreq * i / sampleRate)) * 0.1 * envelope;
-            }
-
-            // Bass
-            const bassFreq = bass[noteIndex % bass.length];
-            if (bassFreq > 0) {
-                const envelope = Math.max(0, 1 - noteTime / (noteDuration * 0.9));
-                sample += Math.sin(2 * Math.PI * bassFreq * i / sampleRate) * 0.15 * envelope;
-            }
-
-            samples[i] = sample;
-        }
-
-        // Convert to 16-bit PCM WAV
-        const buffer = new ArrayBuffer(44 + numSamples * 2);
-        const view = new DataView(buffer);
-
-        // WAV header
-        const writeString = (offset, str) => {
-            for (let i = 0; i < str.length; i++) {
-                view.setUint8(offset + i, str.charCodeAt(i));
-            }
-        };
-
-        writeString(0, 'RIFF');
-        view.setUint32(4, 36 + numSamples * 2, true);
-        writeString(8, 'WAVE');
-        writeString(12, 'fmt ');
-        view.setUint32(16, 16, true); // fmt chunk size
-        view.setUint16(20, 1, true); // PCM format
-        view.setUint16(22, 1, true); // mono
-        view.setUint32(24, sampleRate, true);
-        view.setUint32(28, sampleRate * 2, true); // byte rate
-        view.setUint16(32, 2, true); // block align
-        view.setUint16(34, 16, true); // bits per sample
-        writeString(36, 'data');
-        view.setUint32(40, numSamples * 2, true);
-
-        // Write samples
-        for (let i = 0; i < numSamples; i++) {
-            const sample = Math.max(-1, Math.min(1, samples[i]));
-            view.setInt16(44 + i * 2, sample * 32767, true);
-        }
-
-        // Convert to base64
-        const bytes = new Uint8Array(buffer);
-        let binary = '';
-        for (let i = 0; i < bytes.length; i++) {
-            binary += String.fromCharCode(bytes[i]);
-        }
-        this.audioData = 'data:audio/wav;base64,' + btoa(binary);
-    }
-
-    start() {
-        if (this.isPlaying || !soundEnabled) return;
-
-        console.log('HTML5AudioBGM: Starting...');
-
-        if (!this.audio) {
-            this.audio = new Audio();
-            this.audio.loop = true;
-            this.audio.volume = 0.5;
-        }
-
-        this.audio.src = this.audioData;
-
-        const playPromise = this.audio.play();
-        if (playPromise !== undefined) {
-            playPromise.then(() => {
-                console.log('HTML5AudioBGM: Playing successfully');
-                this.isPlaying = true;
-            }).catch(e => {
-                console.log('HTML5AudioBGM: Play failed:', e.message);
-            });
-        }
-
-        this.isPlaying = true;
-    }
-
-    stop() {
-        if (this.audio) {
-            this.audio.pause();
-            this.audio.currentTime = 0;
-        }
-        this.isPlaying = false;
-    }
-}
-
-// Make html5BgmGenerator globally accessible for iOS audio unlock
-window.html5BgmGenerator = null;
-
+// Simple BGM using pre-generated WAV (works on iOS)
 function startBGM() {
     if (!soundEnabled) return;
+    if (window.bgmIsPlaying) return;
 
-    console.log('startBGM called, useHTML5Audio:', useHTML5Audio);
+    console.log('startBGM called');
 
-    // Use HTML5 Audio on iOS (more reliable)
-    if (useHTML5Audio) {
-        if (!window.html5BgmGenerator) {
-            window.html5BgmGenerator = new HTML5AudioBGM();
-        }
-        if (!window.html5BgmGenerator.isPlaying) {
-            window.html5BgmGenerator.start();
-        }
-        return;
-    }
-
-    // Web Audio API path
-    if (!audioContext) {
-        console.log('startBGM: No audioContext, attempting unlock');
-        unlockAudioContext();
-    }
-
-    if (!audioContext) {
-        console.log('startBGM: Still no audioContext after unlock, falling back to HTML5');
-        useHTML5Audio = true;
-        startBGM();
-        return;
-    }
-
-    // Resume if suspended
-    if (audioContext.state === 'suspended') {
-        console.log('startBGM: Context suspended, resuming...');
-        audioContext.resume().then(() => {
-            console.log('startBGM: Context resumed, state:', audioContext.state);
-            actuallyStartBGM();
+    // Use the pre-generated WAV data
+    if (preGeneratedBGMData && window.bgmAudioElement) {
+        window.bgmAudioElement.play().then(() => {
+            console.log('BGM playing!');
+            window.bgmIsPlaying = true;
         }).catch(e => {
-            console.log('startBGM: Resume failed, falling back to HTML5:', e);
-            useHTML5Audio = true;
-            startBGM();
+            console.log('BGM play failed:', e.message);
         });
     } else {
-        actuallyStartBGM();
-    }
-}
-
-function actuallyStartBGM() {
-    if (!audioContext || audioContext.state !== 'running') {
-        console.log('actuallyStartBGM: Context not running, falling back to HTML5');
-        useHTML5Audio = true;
-        startBGM();
-        return;
-    }
-
-    if (!bgmGenerator) {
-        bgmGenerator = new BGMGenerator();
-    }
-
-    if (!bgmGenerator.isPlaying) {
-        console.log('Starting Web Audio BGM playback');
-        bgmGenerator.start();
+        console.log('BGM not ready - preGeneratedBGMData:', !!preGeneratedBGMData, 'bgmAudioElement:', !!window.bgmAudioElement);
     }
 }
 
 function stopBGM() {
+    console.log('stopBGM called');
+    if (window.bgmAudioElement) {
+        window.bgmAudioElement.pause();
+        window.bgmAudioElement.currentTime = 0;
+    }
+    window.bgmIsPlaying = false;
+
+    // Also stop Web Audio BGM if running
     if (bgmGenerator) {
         bgmGenerator.stop();
     }
-    if (window.html5BgmGenerator) {
-        window.html5BgmGenerator.stop();
+}
+
+// This function MUST be called directly from a user touch/click event handler
+// to work on iOS Safari
+function initAndPlayBGM() {
+    console.log('initAndPlayBGM called - creating audio element');
+
+    if (!preGeneratedBGMData) {
+        console.log('WAV data not ready!');
+        return false;
     }
+
+    // Create audio element if not exists
+    if (!window.bgmAudioElement) {
+        window.bgmAudioElement = new Audio();
+        window.bgmAudioElement.loop = true;
+        window.bgmAudioElement.volume = 0.5;
+        window.bgmAudioElement.src = preGeneratedBGMData;
+        console.log('Audio element created');
+    }
+
+    // Try to play immediately
+    const playPromise = window.bgmAudioElement.play();
+    if (playPromise !== undefined) {
+        playPromise.then(() => {
+            console.log('initAndPlayBGM: BGM started successfully!');
+            window.bgmIsPlaying = true;
+            return true;
+        }).catch(e => {
+            console.log('initAndPlayBGM: Play failed -', e.message);
+            return false;
+        });
+    }
+
+    return true;
 }
 
 function startStarBGM() {

@@ -716,102 +716,41 @@
         setupActionButtons();
 
         // ===============================
-        // iOS AUDIO FIX (HTML5 Audio approach)
+        // iOS AUDIO FIX (Simple approach)
         // ===============================
-        // iOS Safari requires audio play() to be called DIRECTLY in user event handler
-        // Cannot use setTimeout, Promise.then, or any async wrapper
+        // iOS Safari requires audio.play() to be called DIRECTLY in user event handler
+        // The audio element and its src must be set up, then play() called synchronously
 
-        let audioInitialized = false;
-        let iosUnlockAudio = null;  // Pre-created Audio element for iOS
+        let bgmStarted = false;
 
-        // Pre-create the HTML5 Audio element on page load (but don't play yet)
-        function prepareIOSAudio() {
-            if (typeof isIOS !== 'undefined' && isIOS) {
-                console.log('Preparing iOS audio element...');
-                iosUnlockAudio = new Audio();
-                iosUnlockAudio.preload = 'auto';
-            }
-        }
+        // This handler MUST call initAndPlayBGM directly - no wrappers, no async
+        function handleFirstInteraction(e) {
+            if (bgmStarted) return;
 
-        // CRITICAL: Call this SYNCHRONOUSLY within touchend/click handler
-        function unlockAndPlayAudio(e) {
-            if (audioInitialized) return;
+            console.log('First interaction:', e.type);
 
-            console.log('Audio unlock attempt via', e.type);
-
-            // For iOS: Create and play audio DIRECTLY in this handler
-            if (typeof isIOS !== 'undefined' && isIOS && typeof useHTML5Audio !== 'undefined') {
-                console.log('iOS detected, using HTML5 Audio directly');
-
-                // Create and play the BGM generator directly
-                if (typeof HTML5AudioBGM !== 'undefined') {
-                    if (!window.html5BgmGenerator) {
-                        window.html5BgmGenerator = new HTML5AudioBGM();
-                    }
-                    // CRITICAL: Call play() directly in this event handler
-                    if (window.html5BgmGenerator.audio) {
-                        window.html5BgmGenerator.audio.play().then(() => {
-                            console.log('iOS audio unlocked and playing!');
-                            window.html5BgmGenerator.isPlaying = true;
-                            audioInitialized = true;
-                        }).catch(err => {
-                            console.log('iOS audio play failed:', err.message);
-                        });
-                    } else {
-                        // Initialize the audio element
-                        window.html5BgmGenerator.audio = new Audio();
-                        window.html5BgmGenerator.audio.loop = true;
-                        window.html5BgmGenerator.audio.volume = 0.5;
-                        window.html5BgmGenerator.audio.src = window.html5BgmGenerator.audioData;
-                        window.html5BgmGenerator.audio.play().then(() => {
-                            console.log('iOS audio created and playing!');
-                            window.html5BgmGenerator.isPlaying = true;
-                            audioInitialized = true;
-                        }).catch(err => {
-                            console.log('iOS audio creation failed:', err.message);
-                        });
-                    }
-                }
+            // Call initAndPlayBGM directly from the event handler
+            if (typeof initAndPlayBGM === 'function') {
+                initAndPlayBGM();
+                bgmStarted = true;
             }
 
-            // Also try Web Audio API unlock
+            // Also unlock Web Audio API for sound effects
             if (typeof unlockAudioContext === 'function') {
                 unlockAudioContext();
             }
-
-            // Try to resume AudioContext
-            if (typeof audioContext !== 'undefined' && audioContext && audioContext.state === 'suspended') {
-                audioContext.resume();
-            }
-
-            // Start BGM (will use appropriate method)
-            if (typeof startBGM === 'function' && !audioInitialized) {
-                startBGM();
-                audioInitialized = true;
-            }
         }
 
-        // Prepare iOS audio on load
-        prepareIOSAudio();
+        // Attach to multiple event types for best compatibility
+        // touchend works best on iOS Safari
+        document.addEventListener('touchend', handleFirstInteraction, { capture: true, passive: true });
+        document.addEventListener('touchstart', handleFirstInteraction, { capture: true, passive: true });
+        document.addEventListener('click', handleFirstInteraction, { capture: true, passive: true });
 
-        // Listen for user interaction to unlock audio
-        // Use capturing phase and multiple event types for maximum compatibility
-        ['touchend', 'touchstart', 'click'].forEach(eventType => {
-            document.addEventListener(eventType, unlockAndPlayAudio, { capture: true, passive: true, once: false });
-        });
-
-        // Also try on visibility change
+        // Handle visibility change (resume if tab becomes visible)
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                if (typeof audioContext !== 'undefined' && audioContext && audioContext.state === 'suspended') {
-                    audioContext.resume();
-                }
-                // Resume HTML5 audio if it was paused
-                if (window.html5BgmGenerator && window.html5BgmGenerator.audio) {
-                    if (window.html5BgmGenerator.audio.paused && window.html5BgmGenerator.isPlaying) {
-                        window.html5BgmGenerator.audio.play().catch(() => {});
-                    }
-                }
+            if (document.visibilityState === 'visible' && window.bgmAudioElement && window.bgmIsPlaying) {
+                window.bgmAudioElement.play().catch(() => {});
             }
         });
 
