@@ -3,43 +3,68 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 // ===============================
-// SOUND SYSTEM
+// SOUND SYSTEM (iOS Compatible)
 // ===============================
 let audioContext = null;
 let soundEnabled = true;
 let bgmPlaying = false;
 let bgmSource = null;
 let bgmGainNode = null;
+let audioUnlocked = false;
 
-// Initialize Audio Context (must be called after user interaction)
-function initAudio() {
-    if (audioContext) {
-        // Resume if suspended (required for iOS)
-        if (audioContext.state === 'suspended') {
-            audioContext.resume();
-        }
-        return;
-    }
+// iOS Audio Unlock - Must be called synchronously within user event handler
+function unlockAudioContext() {
+    if (audioUnlocked) return;
 
     try {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        // Create context if needed
+        if (!audioContext) {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) {
+                console.warn('Web Audio API not supported');
+                return;
+            }
+            audioContext = new AudioContextClass();
+        }
 
-        // iOS Safari requires resume after user gesture
+        // CRITICAL: resume() must be called synchronously in the event handler
+        // Not inside a Promise or setTimeout
         if (audioContext.state === 'suspended') {
             audioContext.resume();
         }
 
-        // Create a silent buffer and play it to unlock audio on iOS
-        const silentBuffer = audioContext.createBuffer(1, 1, 22050);
+        // Play silent buffer to fully unlock on iOS
+        const buffer = audioContext.createBuffer(1, 1, 22050);
         const source = audioContext.createBufferSource();
-        source.buffer = silentBuffer;
+        source.buffer = buffer;
         source.connect(audioContext.destination);
         source.start(0);
+        source.stop(audioContext.currentTime + 0.001);
 
-        console.log('Audio initialized successfully');
+        // Also create and play an oscillator (more reliable on some iOS versions)
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = 0; // Silent
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.start(0);
+        oscillator.stop(audioContext.currentTime + 0.001);
+
+        audioUnlocked = true;
+        console.log('Audio unlocked successfully, state:', audioContext.state);
     } catch (e) {
-        console.error('Audio initialization failed:', e);
+        console.error('Audio unlock failed:', e);
     }
+}
+
+// Initialize Audio Context (legacy function for compatibility)
+function initAudio() {
+    unlockAudioContext();
+}
+
+// Check if audio is ready to play
+function isAudioReady() {
+    return audioContext && audioContext.state === 'running';
 }
 
 // Generate retro-style sound effects using Web Audio API
@@ -702,7 +727,8 @@ const keys = {
     up: false,
     down: false,
     space: false,
-    fire: false
+    fire: false,
+    dash: false
 };
 
 document.addEventListener('keydown', (e) => {
@@ -743,6 +769,10 @@ document.addEventListener('keydown', (e) => {
                 mario.shootFireball();
             }
             break;
+        case 'ShiftLeft':
+        case 'ShiftRight':
+            keys.dash = true;
+            break;
     }
 });
 
@@ -768,6 +798,10 @@ document.addEventListener('keyup', (e) => {
         case 'KeyX':
         case 'KeyZ':
             keys.fire = false;
+            break;
+        case 'ShiftLeft':
+        case 'ShiftRight':
+            keys.dash = false;
             break;
     }
 });
@@ -1423,8 +1457,16 @@ class Mario {
             this.y -= 24;
         }
 
-        // Horizontal movement (slower when crouching)
-        const moveSpeed = this.isCrouching ? 0.2 : 0.5;
+        // Horizontal movement (slower when crouching, faster when dashing)
+        let moveSpeed = this.isCrouching ? 0.2 : 0.5;
+        let currentMaxSpeed = MAX_SPEED;
+
+        // Dash increases speed
+        if (keys.dash && !this.isCrouching) {
+            moveSpeed = 0.8;
+            currentMaxSpeed = MAX_SPEED * 1.5;
+        }
+
         if (keys.left && !this.isCrouching) {
             this.vx -= moveSpeed;
             this.facing = -1;
@@ -1439,8 +1481,8 @@ class Mario {
             this.vx *= this.isCrouching ? 0.8 : FRICTION;
         }
 
-        // Clamp speed
-        this.vx = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, this.vx));
+        // Clamp speed (higher max when dashing)
+        this.vx = Math.max(-currentMaxSpeed, Math.min(currentMaxSpeed, this.vx));
 
         // Jump (can't jump while crouching)
         if ((keys.up || keys.space) && this.onGround && !this.isJumping && !this.isCrouching) {
@@ -4753,27 +4795,30 @@ function startGame() {
     if (gameStarted) return;
     gameStarted = true;
 
-    // Initialize audio (requires user interaction on iOS)
-    initAudio();
+    // CRITICAL: Unlock audio synchronously within this click/touch handler
+    unlockAudioContext();
+
+    // Also try resume synchronously
+    if (audioContext && audioContext.state === 'suspended') {
+        audioContext.resume();
+    }
 
     // Hide start screen
     document.getElementById('startScreen').style.display = 'none';
 
-    // Start BGM if not already playing (may have started from title screen)
+    // Start BGM after a small delay to let context fully resume
     setTimeout(() => {
+        // Try resume again if needed
         if (audioContext && audioContext.state === 'suspended') {
-            audioContext.resume().then(() => {
-                // Only start if not already playing
-                if (!bgmGenerator || !bgmGenerator.isPlaying) {
-                    startBGM();
-                }
-            });
-        } else {
-            // Only start if not already playing
-            if (!bgmGenerator || !bgmGenerator.isPlaying) {
-                startBGM();
-            }
+            audioContext.resume();
         }
+
+        // Start BGM if not already playing
+        if (!bgmGenerator || !bgmGenerator.isPlaying) {
+            startBGM();
+        }
+
+        console.log('Game started, audio state:', audioContext ? audioContext.state : 'no context');
     }, 100);
 }
 

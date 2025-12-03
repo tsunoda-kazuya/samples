@@ -323,8 +323,8 @@
             right: 75px;
             bottom: 0;
         }
-        #btn-jump {
-            background: #0066cc;
+        #btn-y {
+            background: #f5a623;
             right: 75px;
             top: 0;
         }
@@ -391,7 +391,7 @@
             <button onclick="restartGame()">PLAY AGAIN</button>
         </div>
         <div id="instructions">
-            ←→: 移動 | ↑/SPACE: ジャンプ | ↓: しゃがむ | X/Z: ファイアボール | R: リトライ | M: サウンド
+            ←→: 移動 | ↑/SPACE: ジャンプ | ↓: しゃがむ | SHIFT: ダッシュ | X/Z: ファイアボール | R: リトライ
         </div>
 
         <!-- Touch Controls -->
@@ -406,7 +406,7 @@
             </div>
             <!-- Action Buttons -->
             <div id="actionButtons">
-                <div id="btn-jump" class="action-btn">JUMP</div>
+                <div id="btn-y" class="action-btn">Y</div>
                 <div id="btn-a" class="action-btn">A</div>
                 <div id="btn-b" class="action-btn">B</div>
             </div>
@@ -470,7 +470,8 @@
             up: false,
             down: false,
             jump: false,
-            fire: false
+            fire: false,
+            dash: false
         };
 
         // Map touch controls to game keys
@@ -601,47 +602,23 @@
         }
 
         // Action buttons touch handling
+        // A = Jump, B = Dash (hold), Y = Fire
         function setupActionButtons() {
-            // Jump button
-            const jumpBtn = document.getElementById('btn-jump');
-            if (jumpBtn) {
-                jumpBtn.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    touchState.jump = true;
-                    jumpBtn.classList.add('active');
-                    updateKeysFromTouch();
-                }, { passive: false });
-
-                jumpBtn.addEventListener('touchend', (e) => {
-                    e.preventDefault();
-                    touchState.jump = false;
-                    jumpBtn.classList.remove('active');
-                    updateKeysFromTouch();
-                }, { passive: false });
-
-                jumpBtn.addEventListener('touchcancel', (e) => {
-                    touchState.jump = false;
-                    jumpBtn.classList.remove('active');
-                    updateKeysFromTouch();
-                });
-            }
-
-            // A Button (Jump alternative)
+            // A Button - Jump
             const btnA = document.getElementById('btn-a');
             if (btnA) {
                 btnA.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
+                    e.stopPropagation(); // Don't interfere with other buttons
                     touchState.jump = true;
                     btnA.classList.add('active');
                     updateKeysFromTouch();
-                }, { passive: false });
+                }, { passive: true });
 
                 btnA.addEventListener('touchend', (e) => {
-                    e.preventDefault();
                     touchState.jump = false;
                     btnA.classList.remove('active');
                     updateKeysFromTouch();
-                }, { passive: false });
+                }, { passive: true });
 
                 btnA.addEventListener('touchcancel', (e) => {
                     touchState.jump = false;
@@ -650,27 +627,56 @@
                 });
             }
 
-            // B Button (Fire)
+            // B Button - Dash (hold to run faster)
             const btnB = document.getElementById('btn-b');
             if (btnB) {
                 btnB.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    touchState.fire = true;
+                    e.stopPropagation();
+                    touchState.dash = true;
                     btnB.classList.add('active');
+                    // Update dash state in game
+                    if (typeof keys !== 'undefined') {
+                        keys.dash = true;
+                    }
+                }, { passive: true });
+
+                btnB.addEventListener('touchend', (e) => {
+                    touchState.dash = false;
+                    btnB.classList.remove('active');
+                    if (typeof keys !== 'undefined') {
+                        keys.dash = false;
+                    }
+                }, { passive: true });
+
+                btnB.addEventListener('touchcancel', (e) => {
+                    touchState.dash = false;
+                    btnB.classList.remove('active');
+                    if (typeof keys !== 'undefined') {
+                        keys.dash = false;
+                    }
+                });
+            }
+
+            // Y Button - Fire
+            const btnY = document.getElementById('btn-y');
+            if (btnY) {
+                btnY.addEventListener('touchstart', (e) => {
+                    e.stopPropagation();
+                    touchState.fire = true;
+                    btnY.classList.add('active');
                     if (typeof mario !== 'undefined' && mario && !mario.isDead) {
                         mario.shootFireball();
                     }
-                }, { passive: false });
+                }, { passive: true });
 
-                btnB.addEventListener('touchend', (e) => {
-                    e.preventDefault();
+                btnY.addEventListener('touchend', (e) => {
                     touchState.fire = false;
-                    btnB.classList.remove('active');
-                }, { passive: false });
+                    btnY.classList.remove('active');
+                }, { passive: true });
 
-                btnB.addEventListener('touchcancel', (e) => {
+                btnY.addEventListener('touchcancel', (e) => {
                     touchState.fire = false;
-                    btnB.classList.remove('active');
+                    btnY.classList.remove('active');
                 });
             }
         }
@@ -691,63 +697,79 @@
         setupActionButtons();
 
         // ===============================
-        // MOBILE AUDIO FIX
+        // iOS AUDIO FIX (Robust Implementation)
         // ===============================
-        // iOS requires audio to be unlocked on first user touch
-        let audioUnlocked = false;
-        let titleBgmStarted = false;
+        // iOS Safari requires audio unlock on touchend (not touchstart since iOS 9)
+        // The unlock must happen SYNCHRONOUSLY within the event handler
+        // Do NOT use Promise.then() or setTimeout() for the unlock itself
 
-        function unlockAudioAndPlayBGM() {
-            // Try to initialize audio
-            if (typeof initAudio === 'function') {
-                initAudio();
+        let titleBgmStarted = false;
+        let unlockAttempts = 0;
+
+        // CRITICAL: This function must be called synchronously from event handler
+        function unlockAndPlayAudio() {
+            unlockAttempts++;
+            console.log('Audio unlock attempt #' + unlockAttempts);
+
+            // Step 1: Unlock audio context synchronously (MUST be synchronous)
+            if (typeof unlockAudioContext === 'function') {
+                unlockAudioContext();
             }
 
-            // Also try to resume any existing context and start BGM
+            // Step 2: Try to resume if still suspended
             if (typeof audioContext !== 'undefined' && audioContext) {
+                // Synchronous resume attempt
                 if (audioContext.state === 'suspended') {
-                    audioContext.resume().then(() => {
-                        console.log('Audio context resumed successfully');
-                        // Start title screen BGM after unlock
+                    audioContext.resume();
+                }
+
+                // Step 3: Start BGM if audio is running
+                // Use a small delay to let the context state update
+                setTimeout(() => {
+                    if (audioContext.state === 'running') {
                         if (!titleBgmStarted && typeof startBGM === 'function') {
-                            setTimeout(() => {
-                                startBGM();
-                                titleBgmStarted = true;
-                            }, 100);
+                            startBGM();
+                            titleBgmStarted = true;
+                            console.log('BGM started successfully');
                         }
-                    }).catch(e => {
-                        console.log('Audio resume failed:', e);
-                    });
-                } else {
-                    // Already running, start BGM
-                    if (!titleBgmStarted && typeof startBGM === 'function') {
-                        startBGM();
-                        titleBgmStarted = true;
+                    } else {
+                        console.log('AudioContext state:', audioContext.state);
                     }
+                }, 50);
+            }
+        }
+
+        // iOS requires touchend (not touchstart) since iOS 9
+        // We listen to multiple events and try multiple times
+        const audioUnlockEvents = ['touchend', 'touchstart', 'click', 'keydown'];
+
+        audioUnlockEvents.forEach(eventType => {
+            document.body.addEventListener(eventType, unlockAndPlayAudio, { passive: true });
+        });
+
+        // Special handling for start screen - higher priority
+        const startScreen = document.getElementById('startScreen');
+        const startBtn = startScreen ? startScreen.querySelector('button') : null;
+
+        if (startScreen) {
+            // Use capturing phase to get the event first
+            startScreen.addEventListener('touchend', unlockAndPlayAudio, { capture: true, passive: true });
+            startScreen.addEventListener('click', unlockAndPlayAudio, { capture: true, passive: true });
+        }
+
+        if (startBtn) {
+            startBtn.addEventListener('touchend', unlockAndPlayAudio, { capture: true, passive: true });
+            startBtn.addEventListener('click', unlockAndPlayAudio, { capture: true, passive: true });
+        }
+
+        // Also try on visibility change (when user returns to tab)
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && typeof audioContext !== 'undefined' && audioContext) {
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
                 }
             }
-
-            audioUnlocked = true;
-            console.log('Audio unlock attempted');
-        }
-
-        // Unlock audio on first touch anywhere
-        document.addEventListener('touchstart', unlockAudioAndPlayBGM, { once: true });
-        document.addEventListener('touchend', unlockAudioAndPlayBGM, { once: true });
-        document.addEventListener('click', unlockAudioAndPlayBGM, { once: true });
-
-        // Also unlock on start screen tap
-        const startScreen = document.getElementById('startScreen');
-        if (startScreen) {
-            startScreen.addEventListener('touchstart', unlockAudioAndPlayBGM);
-            startScreen.addEventListener('click', unlockAudioAndPlayBGM);
-        }
-
-        // Unlock on start button click
-        const startBtn = startScreen ? startScreen.querySelector('button') : null;
-        if (startBtn) {
-            startBtn.addEventListener('touchstart', unlockAudioAndPlayBGM);
-        }
+        });
 
         // Prevent zoom on double tap
         let lastTouchEnd = 0;
