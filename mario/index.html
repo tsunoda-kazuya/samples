@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="screen-orientation" content="landscape">
+    <title>スーパーマリオブラザーズ</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        html, body {
+            background: #000;
+            overflow: hidden;
+            touch-action: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Press Start 2P', monospace;
+        }
+        #gameContainer {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        canvas {
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        #ui {
+            position: absolute;
+            top: 5px;
+            left: 10px;
+            right: 10px;
+            color: white;
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+            text-shadow: 1px 1px 2px #000;
+            z-index: 50;
+        }
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 20px;
+            text-align: center;
+            display: none;
+            z-index: 200;
+            background: rgba(0,0,0,0.9);
+            padding: 30px;
+            border-radius: 15px;
+        }
+        #gameOver button {
+            margin-top: 15px;
+            padding: 12px 24px;
+            font-size: 14px;
+            cursor: pointer;
+            background: #e52521;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            touch-action: manipulation;
+        }
+        #instructions {
+            position: absolute;
+            bottom: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 10px;
+            text-align: center;
+            text-shadow: 1px 1px 2px #000;
+            z-index: 50;
+        }
+        /* Hide keyboard instructions on mobile */
+        @media (max-width: 900px), (hover: none) {
+            #instructions {
+                display: none;
+            }
+        }
+        #soundToggle {
+            position: absolute;
+            top: 30px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: white;
+            border: 2px solid white;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 12px;
+            border-radius: 5px;
+            z-index: 60;
+            touch-action: manipulation;
+        }
+        #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 100;
+        }
+        #startScreen h1 {
+            font-size: 24px;
+            margin-bottom: 15px;
+            color: #e52521;
+            text-shadow: 3px 3px 0 #000;
+        }
+        #startScreen button {
+            padding: 15px 40px;
+            font-size: 16px;
+            cursor: pointer;
+            background: #3cbf00;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            margin-top: 15px;
+            touch-action: manipulation;
+        }
+        #startScreen p {
+            margin-top: 20px;
+            font-size: 10px;
+            color: #aaa;
+            text-align: center;
+            padding: 0 20px;
+        }
+        #victory {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 16px;
+            text-align: center;
+            display: none;
+            background: rgba(0,0,0,0.9);
+            padding: 30px;
+            border-radius: 15px;
+            border: 3px solid #ffcc00;
+            z-index: 200;
+        }
+        #victory h2 {
+            font-size: 24px;
+            color: #ffcc00;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 0 #000;
+        }
+        #victory .stars {
+            font-size: 30px;
+            margin: 15px 0;
+        }
+        #gameComplete {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 16px;
+            text-align: center;
+            display: none;
+            background: rgba(0,0,0,0.95);
+            padding: 30px;
+            border-radius: 15px;
+            border: 3px solid #ffcc00;
+            z-index: 200;
+        }
+        #gameComplete h2 {
+            font-size: 24px;
+            color: #ffcc00;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 0 #e52521;
+        }
+        #gameComplete .trophy {
+            font-size: 50px;
+            margin: 15px 0;
+        }
+        #gameComplete .final-score {
+            font-size: 18px;
+            color: #3cbf00;
+            margin: 15px 0;
+        }
+        #gameComplete button {
+            margin-top: 15px;
+            padding: 12px 30px;
+            font-size: 14px;
+            cursor: pointer;
+            background: #e52521;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            touch-action: manipulation;
+        }
+
+        /* ===============================
+           TOUCH CONTROLS
+           =============================== */
+        #touchControls {
+            display: none;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 140px;
+            z-index: 80;
+            pointer-events: none;
+        }
+        /* Show touch controls on touch devices */
+        @media (hover: none) and (pointer: coarse) {
+            #touchControls {
+                display: block;
+            }
+        }
+        /* D-Pad (Left side) */
+        #dpad {
+            position: absolute;
+            left: 20px;
+            bottom: 20px;
+            width: 120px;
+            height: 120px;
+            pointer-events: auto;
+        }
+        .dpad-btn {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: rgba(255,255,255,0.3);
+            border: 2px solid rgba(255,255,255,0.5);
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            color: white;
+            touch-action: manipulation;
+        }
+        .dpad-btn:active, .dpad-btn.active {
+            background: rgba(255,255,255,0.6);
+        }
+        #dpad-up {
+            top: 0;
+            left: 40px;
+        }
+        #dpad-down {
+            bottom: 0;
+            left: 40px;
+        }
+        #dpad-left {
+            top: 40px;
+            left: 0;
+        }
+        #dpad-right {
+            top: 40px;
+            right: 0;
+        }
+        #dpad-center {
+            top: 40px;
+            left: 40px;
+            background: rgba(100,100,100,0.3);
+            border: none;
+        }
+
+        /* Action Buttons (Right side) */
+        #actionButtons {
+            position: absolute;
+            right: 20px;
+            bottom: 20px;
+            width: 140px;
+            height: 120px;
+            pointer-events: auto;
+        }
+        .action-btn {
+            position: absolute;
+            width: 55px;
+            height: 55px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px #000;
+            touch-action: manipulation;
+            border: 3px solid rgba(255,255,255,0.5);
+        }
+        .action-btn:active, .action-btn.active {
+            transform: scale(0.95);
+            filter: brightness(1.3);
+        }
+        #btn-a {
+            background: #e52521;
+            right: 0;
+            bottom: 30px;
+        }
+        #btn-b {
+            background: #3cbf00;
+            right: 65px;
+            bottom: 0;
+        }
+        #btn-jump {
+            background: #0066cc;
+            right: 65px;
+            top: 0;
+        }
+
+        /* Pause button */
+        #pauseBtn {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.5);
+            color: white;
+            border: 2px solid white;
+            padding: 5px 15px;
+            font-size: 10px;
+            border-radius: 5px;
+            z-index: 60;
+            display: none;
+            touch-action: manipulation;
+        }
+        @media (hover: none) and (pointer: coarse) {
+            #pauseBtn {
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="480"></canvas>
+        <div id="startScreen">
+            <h1>SUPER MARIO BROS</h1>
+            <p>タップしてゲームスタート</p>
+            <button onclick="startGame()">START GAME</button>
+            <p>スマホは横画面でプレイしてください</p>
+        </div>
+        <button id="soundToggle" onclick="toggleSound()">🔊</button>
+        <button id="pauseBtn" onclick="togglePause()">PAUSE</button>
+        <div id="ui">
+            <span>MARIO <span id="score">000000</span></span>
+            <span>COINS <span id="coins">00</span></span>
+            <span>WORLD <span id="world">1-1</span></span>
+            <span>TIME <span id="time">400</span></span>
+        </div>
+        <div id="gameOver">
+            <div>GAME OVER</div>
+            <div style="margin-top: 10px; font-size: 12px;">同じステージをもう一度プレイ</div>
+            <button onclick="retryLevel()">RETRY</button>
+            <button onclick="restartGame()" style="background: #666; margin-left: 10px;">NEW GAME</button>
+        </div>
+        <div id="victory">
+            <h2>COURSE CLEAR!</h2>
+            <div class="stars">⭐⭐⭐</div>
+            <div>おめでとう！</div>
+            <div id="levelClearText" style="margin-top: 10px;">WORLD 1-1 CLEAR!</div>
+            <div style="margin-top: 10px; font-size: 12px;">次のステージへ...</div>
+        </div>
+        <div id="gameComplete">
+            <h2>CONGRATULATIONS!</h2>
+            <div class="trophy">🏆</div>
+            <div>全ステージクリア！</div>
+            <div class="final-score">FINAL SCORE: <span id="finalScore">0</span></div>
+            <div style="margin-top: 10px; font-size: 12px;">あなたは真のスーパーマリオマスターです！</div>
+            <button onclick="restartGame()">PLAY AGAIN</button>
+        </div>
+        <div id="instructions">
+            ←→: 移動 | ↑/SPACE: ジャンプ | ↓: しゃがむ | X/Z: ファイアボール | R: リトライ | M: サウンド
+        </div>
+
+        <!-- Touch Controls -->
+        <div id="touchControls">
+            <!-- D-Pad -->
+            <div id="dpad">
+                <div id="dpad-up" class="dpad-btn">▲</div>
+                <div id="dpad-down" class="dpad-btn">▼</div>
+                <div id="dpad-left" class="dpad-btn">◀</div>
+                <div id="dpad-right" class="dpad-btn">▶</div>
+                <div id="dpad-center" class="dpad-btn"></div>
+            </div>
+            <!-- Action Buttons -->
+            <div id="actionButtons">
+                <div id="btn-jump" class="action-btn">JUMP</div>
+                <div id="btn-a" class="action-btn">A</div>
+                <div id="btn-b" class="action-btn">B</div>
+            </div>
+        </div>
+    </div>
+    <script src="game.js"></script>
+    <script>
+        // ===============================
+        // TOUCH CONTROL HANDLING
+        // ===============================
+
+        // Resize canvas to fit screen
+        function resizeCanvas() {
+            const canvas = document.getElementById('gameCanvas');
+            const container = document.getElementById('gameContainer');
+
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+
+            // Calculate scale to fit screen while maintaining aspect ratio
+            const gameAspect = 800 / 480;
+            const windowAspect = windowWidth / windowHeight;
+
+            let scale;
+            if (windowAspect > gameAspect) {
+                // Window is wider than game
+                scale = windowHeight / 480;
+            } else {
+                // Window is taller than game
+                scale = windowWidth / 800;
+            }
+
+            // Apply scale with some padding for touch controls on mobile
+            const isMobile = 'ontouchstart' in window;
+            if (isMobile && windowHeight < 500) {
+                scale *= 0.75; // Shrink game to leave room for controls
+            }
+
+            canvas.style.width = (800 * scale) + 'px';
+            canvas.style.height = (480 * scale) + 'px';
+        }
+
+        // Initialize resize
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(resizeCanvas, 100);
+        });
+
+        // Prevent default touch behaviors
+        document.addEventListener('touchmove', (e) => {
+            if (e.target.closest('#touchControls') || e.target.closest('#gameContainer')) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        // Touch control state
+        const touchState = {
+            left: false,
+            right: false,
+            up: false,
+            down: false,
+            jump: false,
+            fire: false
+        };
+
+        // Map touch controls to game keys
+        function updateKeysFromTouch() {
+            if (typeof keys !== 'undefined') {
+                keys.left = touchState.left;
+                keys.right = touchState.right;
+                keys.up = touchState.jump || touchState.up;
+                keys.down = touchState.down;
+            }
+        }
+
+        // D-Pad touch handling
+        function setupDPad() {
+            const dpadButtons = {
+                'dpad-up': 'up',
+                'dpad-down': 'down',
+                'dpad-left': 'left',
+                'dpad-right': 'right'
+            };
+
+            Object.entries(dpadButtons).forEach(([id, direction]) => {
+                const btn = document.getElementById(id);
+                if (!btn) return;
+
+                btn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    touchState[direction] = true;
+                    btn.classList.add('active');
+                    updateKeysFromTouch();
+                }, { passive: false });
+
+                btn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    touchState[direction] = false;
+                    btn.classList.remove('active');
+                    updateKeysFromTouch();
+                }, { passive: false });
+
+                btn.addEventListener('touchcancel', (e) => {
+                    touchState[direction] = false;
+                    btn.classList.remove('active');
+                    updateKeysFromTouch();
+                });
+            });
+        }
+
+        // Action buttons touch handling
+        function setupActionButtons() {
+            // Jump button
+            const jumpBtn = document.getElementById('btn-jump');
+            if (jumpBtn) {
+                jumpBtn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    touchState.jump = true;
+                    jumpBtn.classList.add('active');
+                    updateKeysFromTouch();
+                }, { passive: false });
+
+                jumpBtn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    touchState.jump = false;
+                    jumpBtn.classList.remove('active');
+                    updateKeysFromTouch();
+                }, { passive: false });
+
+                jumpBtn.addEventListener('touchcancel', (e) => {
+                    touchState.jump = false;
+                    jumpBtn.classList.remove('active');
+                    updateKeysFromTouch();
+                });
+            }
+
+            // A Button (Jump alternative)
+            const btnA = document.getElementById('btn-a');
+            if (btnA) {
+                btnA.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    touchState.jump = true;
+                    btnA.classList.add('active');
+                    updateKeysFromTouch();
+                }, { passive: false });
+
+                btnA.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    touchState.jump = false;
+                    btnA.classList.remove('active');
+                    updateKeysFromTouch();
+                }, { passive: false });
+
+                btnA.addEventListener('touchcancel', (e) => {
+                    touchState.jump = false;
+                    btnA.classList.remove('active');
+                    updateKeysFromTouch();
+                });
+            }
+
+            // B Button (Fire)
+            const btnB = document.getElementById('btn-b');
+            if (btnB) {
+                btnB.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    touchState.fire = true;
+                    btnB.classList.add('active');
+                    if (typeof mario !== 'undefined' && mario && !mario.isDead) {
+                        mario.shootFireball();
+                    }
+                }, { passive: false });
+
+                btnB.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    touchState.fire = false;
+                    btnB.classList.remove('active');
+                }, { passive: false });
+
+                btnB.addEventListener('touchcancel', (e) => {
+                    touchState.fire = false;
+                    btnB.classList.remove('active');
+                });
+            }
+        }
+
+        // Pause functionality
+        function togglePause() {
+            if (typeof gameState !== 'undefined') {
+                gameState.isPaused = !gameState.isPaused;
+                const pauseBtn = document.getElementById('pauseBtn');
+                if (pauseBtn) {
+                    pauseBtn.textContent = gameState.isPaused ? 'RESUME' : 'PAUSE';
+                }
+            }
+        }
+
+        // Initialize touch controls
+        setupDPad();
+        setupActionButtons();
+
+        // Prevent zoom on double tap
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (e) => {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                e.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, { passive: false });
+
+        // Lock to landscape on mobile if possible
+        if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('landscape').catch(() => {
+                // Orientation lock not supported or denied
+            });
+        }
+    </script>
+</body>
+</html>
