@@ -848,14 +848,37 @@ function initAndPlayBGM() {
 }
 
 function startStarBGM() {
-    if (!audioContext || !soundEnabled) return;
+    if (!soundEnabled) return;
+
+    // Ensure audio context exists and is running
+    if (!audioContext) {
+        try {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (e) {
+            console.log('Failed to create audio context for star BGM');
+            return;
+        }
+    }
+
+    // Resume audio context if suspended (iOS requirement)
+    if (audioContext.state === 'suspended') {
+        audioContext.resume();
+    }
+
     // Stop normal BGM first
     stopBGM();
+
+    // Also pause HTML5 audio BGM if playing
+    if (window.bgmAudioElement) {
+        window.bgmAudioElement.pause();
+    }
+
     if (!starBgmGenerator) {
         starBgmGenerator = new StarBGMGenerator();
     }
     starBgmGenerator.start();
     isStarMusicPlaying = true;
+    console.log('Star BGM started');
 }
 
 function stopStarBGM() {
@@ -863,8 +886,14 @@ function stopStarBGM() {
         starBgmGenerator.stop();
     }
     isStarMusicPlaying = false;
+    console.log('Star BGM stopped');
+
     // Resume normal BGM if game is still playing
     if (!gameState.isVictory && !gameState.isGameOver && mario && !mario.isDead) {
+        // Resume HTML5 audio BGM
+        if (window.bgmAudioElement && window.bgmIsPlaying) {
+            window.bgmAudioElement.play().catch(() => {});
+        }
         startBGM();
     }
 }
@@ -2237,6 +2266,21 @@ class Mario {
 
     // Get color palette based on power state
     getColors() {
+        // Star power rainbow effect - cycle through colors
+        if (this.hasStarPower) {
+            const colorIndex = Math.floor(Date.now() / 50) % 7;
+            const rainbowColors = [
+                { hat: '#ff0000', hatDark: '#cc0000', hatLight: '#ff4444', shirt: '#ff0000', shirtDark: '#cc0000', overalls: '#ffff00', overallsDark: '#cccc00' }, // Red/Yellow
+                { hat: '#ff8800', hatDark: '#cc6600', hatLight: '#ffaa44', shirt: '#ff8800', shirtDark: '#cc6600', overalls: '#00ffff', overallsDark: '#00cccc' }, // Orange/Cyan
+                { hat: '#ffff00', hatDark: '#cccc00', hatLight: '#ffff66', shirt: '#ffff00', shirtDark: '#cccc00', overalls: '#ff00ff', overallsDark: '#cc00cc' }, // Yellow/Magenta
+                { hat: '#00ff00', hatDark: '#00cc00', hatLight: '#66ff66', shirt: '#00ff00', shirtDark: '#00cc00', overalls: '#ff0000', overallsDark: '#cc0000' }, // Green/Red
+                { hat: '#00ffff', hatDark: '#00cccc', hatLight: '#66ffff', shirt: '#00ffff', shirtDark: '#00cccc', overalls: '#ff8800', overallsDark: '#cc6600' }, // Cyan/Orange
+                { hat: '#0088ff', hatDark: '#0066cc', hatLight: '#44aaff', shirt: '#0088ff', shirtDark: '#0066cc', overalls: '#ffff00', overallsDark: '#cccc00' }, // Blue/Yellow
+                { hat: '#ff00ff', hatDark: '#cc00cc', hatLight: '#ff66ff', shirt: '#ff00ff', shirtDark: '#cc00cc', overalls: '#00ff00', overallsDark: '#00cc00' }  // Magenta/Green
+            ];
+            return rainbowColors[colorIndex];
+        }
+
         if (this.hasFire) {
             return {
                 hat: '#ffffff', hatDark: '#dddddd', hatLight: '#ffffff',
