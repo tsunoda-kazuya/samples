@@ -582,30 +582,19 @@
         <canvas id="gameCanvas"></canvas>
 
         <!-- Version -->
-        <div style="position:absolute;top:5px;left:50%;transform:translateX(-50%);font-size:10px;color:#ff69b4;z-index:200;font-weight:bold;">v1.8</div>
+        <div style="position:absolute;top:5px;left:50%;transform:translateX(-50%);font-size:10px;color:#ff69b4;z-index:200;font-weight:bold;">v2.0</div>
 
-        <!-- Title and Next -->
-        <div class="ui-overlay top-left">
-            <div class="panel">
-                <div class="title-deco">
-                    <h1>ぷよぷよ</h1>
-                </div>
-                <h3>つぎのぷよ</h3>
+        <!-- Score and Next Panel (Right side) -->
+        <div class="ui-overlay top-right">
+            <div class="panel" style="position: relative; overflow: hidden;">
+                <h3>つぎ</h3>
                 <div class="next-preview">
                     <canvas id="nextCanvas" width="55" height="85"></canvas>
                 </div>
-            </div>
-        </div>
-
-        <!-- Score Panel -->
-        <div class="ui-overlay top-right">
-            <div class="panel" style="position: relative; overflow: hidden;">
-                <h3>スコア</h3>
+                <h3 style="margin-top: 6px;">スコア</h3>
                 <p class="stat-value" id="score">0</p>
-                <h3 style="margin-top: 8px;">れんさ</h3>
+                <h3 style="margin-top: 6px;">れんさ</h3>
                 <p class="stat-value" id="chains">0</p>
-                <h3 style="margin-top: 8px;">レベル</h3>
-                <p class="stat-value" id="level">1</p>
             </div>
         </div>
 

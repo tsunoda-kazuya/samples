@@ -1573,7 +1573,8 @@ function darkenColor(color, percent) {
 function updateUI() {
     document.getElementById('score').textContent = score.toLocaleString();
     document.getElementById('chains').textContent = chains;
-    document.getElementById('level').textContent = level;
+    const levelEl = document.getElementById('level');
+    if (levelEl) levelEl.textContent = level;
 }
 
 // ========================
@@ -1723,93 +1724,281 @@ function toggleMusic() {
 }
 
 // ========================
-// TOUCH CONTROLS
+// TOUCH CONTROLS (Mario-style)
 // ========================
 
-function setupTouchControls() {
-    // D-pad controls
-    const dpadLeft = document.getElementById('dpad-left');
-    const dpadRight = document.getElementById('dpad-right');
-    const dpadDown = document.getElementById('dpad-down');
+const touchState = {
+    left: false,
+    right: false,
+    down: false,
+    rotateLeft: false,
+    rotateRight: false,
+    drop: false
+};
 
-    // Action buttons
+let activeDpadTouchId = null;
+let dpadRepeatInterval = null;
+
+function setupTouchControls() {
+    const dpad = document.getElementById('dpad');
+    const actionButtons = document.getElementById('actionButtons');
+    const mobileStart = document.getElementById('mobileStart');
+
+    // D-pad button elements for visual feedback
+    const dpadButtons = {
+        left: document.getElementById('dpad-left'),
+        right: document.getElementById('dpad-right'),
+        down: document.getElementById('dpad-down')
+    };
+
+    function clearDpadState() {
+        touchState.left = false;
+        touchState.right = false;
+        touchState.down = false;
+        Object.values(dpadButtons).forEach(btn => {
+            if (btn) btn.classList.remove('active');
+        });
+        if (dpadRepeatInterval) {
+            clearInterval(dpadRepeatInterval);
+            dpadRepeatInterval = null;
+        }
+    }
+
+    function executeDpadAction() {
+        if (gameOver || paused || animating) return;
+        if (touchState.left) movePuyo(-1, 0);
+        if (touchState.right) movePuyo(1, 0);
+        if (touchState.down) {
+            if (movePuyo(0, 1)) {
+                score += 1;
+                updateUI();
+            }
+        }
+    }
+
+    function updateDpadFromTouch(touch) {
+        if (!dpad) return;
+        const dpadRect = dpad.getBoundingClientRect();
+        const x = touch.clientX - dpadRect.left;
+        const y = touch.clientY - dpadRect.top;
+
+        const centerX = dpadRect.width / 2;
+        const centerY = dpadRect.height / 2;
+        const dx = x - centerX;
+        const dy = y - centerY;
+
+        clearDpadState();
+
+        const deadZone = 15;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < deadZone) return;
+
+        // Determine direction based on angle
+        if (Math.abs(dx) > Math.abs(dy) * 0.5) {
+            // Horizontal dominant
+            if (dx > 0) {
+                touchState.right = true;
+                if (dpadButtons.right) dpadButtons.right.classList.add('active');
+            } else {
+                touchState.left = true;
+                if (dpadButtons.left) dpadButtons.left.classList.add('active');
+            }
+        }
+        if (Math.abs(dy) > Math.abs(dx) * 0.5 && dy > 0) {
+            // Down
+            touchState.down = true;
+            if (dpadButtons.down) dpadButtons.down.classList.add('active');
+        }
+
+        // Execute immediately
+        executeDpadAction();
+
+        // Start repeat interval
+        if (!dpadRepeatInterval && (touchState.left || touchState.right || touchState.down)) {
+            dpadRepeatInterval = setInterval(executeDpadAction, 80);
+        }
+    }
+
+    if (dpad) {
+        dpad.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                if (activeDpadTouchId === null) {
+                    activeDpadTouchId = touch.identifier;
+                    updateDpadFromTouch(touch);
+                }
+            }
+        }, { passive: false });
+
+        dpad.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === activeDpadTouchId) {
+                    updateDpadFromTouch(e.changedTouches[i]);
+                    break;
+                }
+            }
+        }, { passive: false });
+
+        dpad.addEventListener('touchend', (e) => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === activeDpadTouchId) {
+                    activeDpadTouchId = null;
+                    clearDpadState();
+                    break;
+                }
+            }
+        }, { passive: true });
+
+        dpad.addEventListener('touchcancel', (e) => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === activeDpadTouchId) {
+                    activeDpadTouchId = null;
+                    clearDpadState();
+                    break;
+                }
+            }
+        }, { passive: true });
+    }
+
+    // Action buttons handling
     const btnRotateLeft = document.getElementById('btn-rotate-left');
     const btnRotateRight = document.getElementById('btn-rotate-right');
     const btnDrop = document.getElementById('btn-drop');
 
-    // Mobile start button
-    const mobileStart = document.getElementById('mobileStart');
+    const activeTouches = {
+        rotateLeft: new Set(),
+        rotateRight: new Set(),
+        drop: new Set()
+    };
 
-    // Helper to handle touch and click events
-    function addTouchHandler(element, action, isDirectional = false) {
-        if (!element) return;
+    const touchToButtons = new Map();
 
-        let intervalId = null;
+    function getAllButtonsFromPoint(x, y) {
+        const result = [];
+        const buttonList = [
+            { el: btnRotateLeft, name: 'rotateLeft' },
+            { el: btnRotateRight, name: 'rotateRight' },
+            { el: btnDrop, name: 'drop' }
+        ];
 
-        // Touch events
-        element.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (gameOver || paused) return;
-            action();
-            if (isDirectional) {
-                intervalId = setInterval(action, 100);
+        const expandedMargin = 15; // Larger touch area
+
+        for (const btn of buttonList) {
+            if (!btn.el) continue;
+            const rect = btn.el.getBoundingClientRect();
+            const expandedRect = {
+                left: rect.left - expandedMargin,
+                right: rect.right + expandedMargin,
+                top: rect.top - expandedMargin,
+                bottom: rect.bottom + expandedMargin
+            };
+
+            if (x >= expandedRect.left && x <= expandedRect.right &&
+                y >= expandedRect.top && y <= expandedRect.bottom) {
+                result.push(btn.name);
             }
-        }, { passive: false });
+        }
 
-        element.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            if (intervalId) {
-                clearInterval(intervalId);
-                intervalId = null;
-            }
-        }, { passive: false });
-
-        element.addEventListener('touchcancel', (e) => {
-            if (intervalId) {
-                clearInterval(intervalId);
-                intervalId = null;
-            }
-        }, { passive: false });
-
-        // Mouse click events for PC
-        element.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            if (gameOver || paused) return;
-            action();
-            if (isDirectional) {
-                intervalId = setInterval(action, 100);
-            }
-        });
-
-        element.addEventListener('mouseup', (e) => {
-            if (intervalId) {
-                clearInterval(intervalId);
-                intervalId = null;
-            }
-        });
-
-        element.addEventListener('mouseleave', (e) => {
-            if (intervalId) {
-                clearInterval(intervalId);
-                intervalId = null;
-            }
-        });
+        return result;
     }
 
-    // D-pad handlers (directional = true for continuous movement)
-    addTouchHandler(dpadLeft, () => movePuyo(-1, 0), true);
-    addTouchHandler(dpadRight, () => movePuyo(1, 0), true);
-    addTouchHandler(dpadDown, () => {
-        if (movePuyo(0, 1)) {
-            score += 1;
-            updateUI();
-        }
-    }, true);
+    function updateButtonStates() {
+        const rotateLeftPressed = activeTouches.rotateLeft.size > 0;
+        if (btnRotateLeft) btnRotateLeft.classList.toggle('active', rotateLeftPressed);
 
-    // Action button handlers (not directional)
-    addTouchHandler(btnRotateLeft, () => rotatePuyo(-1), false);
-    addTouchHandler(btnRotateRight, () => rotatePuyo(1), false);
-    addTouchHandler(btnDrop, () => hardDrop(), false);
+        const rotateRightPressed = activeTouches.rotateRight.size > 0;
+        if (btnRotateRight) btnRotateRight.classList.toggle('active', rotateRightPressed);
+
+        const dropPressed = activeTouches.drop.size > 0;
+        if (btnDrop) btnDrop.classList.toggle('active', dropPressed);
+    }
+
+    function processTouchPoint(touch, isStart = false) {
+        const touchId = touch.identifier;
+        const x = touch.clientX;
+        const y = touch.clientY;
+
+        const buttonsNow = getAllButtonsFromPoint(x, y);
+
+        if (!touchToButtons.has(touchId)) {
+            touchToButtons.set(touchId, new Set());
+        }
+        const previousButtons = touchToButtons.get(touchId);
+
+        // Rotate Left - trigger on first touch only
+        if (!previousButtons.has('rotateLeft') && buttonsNow.includes('rotateLeft')) {
+            previousButtons.add('rotateLeft');
+            activeTouches.rotateLeft.add(touchId);
+            if (isStart && !gameOver && !paused) rotatePuyo(-1);
+        }
+
+        // Rotate Right - trigger on first touch only
+        if (!previousButtons.has('rotateRight') && buttonsNow.includes('rotateRight')) {
+            previousButtons.add('rotateRight');
+            activeTouches.rotateRight.add(touchId);
+            if (isStart && !gameOver && !paused) rotatePuyo(1);
+        }
+
+        // Drop - trigger on first touch only
+        if (!previousButtons.has('drop') && buttonsNow.includes('drop')) {
+            previousButtons.add('drop');
+            activeTouches.drop.add(touchId);
+            if (isStart && !gameOver && !paused) hardDrop();
+        }
+    }
+
+    function removeTouchState(touchId) {
+        activeTouches.rotateLeft.delete(touchId);
+        activeTouches.rotateRight.delete(touchId);
+        activeTouches.drop.delete(touchId);
+        touchToButtons.delete(touchId);
+    }
+
+    if (actionButtons) {
+        actionButtons.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                processTouchPoint(e.changedTouches[i], true);
+            }
+            updateButtonStates();
+        }, { passive: false });
+
+        actionButtons.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                processTouchPoint(e.changedTouches[i], false);
+            }
+            updateButtonStates();
+        }, { passive: false });
+
+        actionButtons.addEventListener('touchend', (e) => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                removeTouchState(e.changedTouches[i].identifier);
+            }
+            updateButtonStates();
+        }, { passive: true });
+
+        actionButtons.addEventListener('touchcancel', (e) => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                removeTouchState(e.changedTouches[i].identifier);
+            }
+            updateButtonStates();
+        }, { passive: true });
+    }
+
+    // Global touch end tracking
+    document.addEventListener('touchend', (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touchId = e.changedTouches[i].identifier;
+            if (touchToButtons.has(touchId)) {
+                removeTouchState(touchId);
+                updateButtonStates();
+            }
+        }
+    }, { passive: true });
 
     // Mobile start button
     if (mobileStart) {
@@ -1824,6 +2013,21 @@ function setupTouchControls() {
             startGame();
         });
     }
+
+    // Mouse support for PC testing
+    function addMouseHandler(element, action) {
+        if (!element) return;
+        element.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            if (!gameOver && !paused) action();
+        });
+    }
+    addMouseHandler(dpadButtons.left, () => movePuyo(-1, 0));
+    addMouseHandler(dpadButtons.right, () => movePuyo(1, 0));
+    addMouseHandler(dpadButtons.down, () => { if (movePuyo(0, 1)) { score += 1; updateUI(); } });
+    addMouseHandler(btnRotateLeft, () => rotatePuyo(-1));
+    addMouseHandler(btnRotateRight, () => rotatePuyo(1));
+    addMouseHandler(btnDrop, () => hardDrop());
 }
 
 // Initialize touch controls
