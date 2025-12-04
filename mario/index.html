@@ -353,6 +353,9 @@
     </style>
 </head>
 <body>
+    <!-- Hidden audio element for iOS compatibility -->
+    <audio id="bgmAudio" loop playsinline webkit-playsinline preload="auto"></audio>
+
     <div id="gameContainer">
         <canvas id="gameCanvas" width="800" height="480"></canvas>
         <div id="startScreen">
@@ -485,6 +488,9 @@
         }
 
         // D-Pad touch handling with slide support
+        // Expose dpad touch ID so action buttons can work independently
+        let activeDpadTouchId = null;
+
         function setupDPad() {
             const dpad = document.getElementById('dpad');
             const dpadButtons = {
@@ -562,22 +568,23 @@
                 updateKeysFromTouch();
             }
 
-            // Track active touches on D-pad
-            let activeDpadTouchId = null;
-
             dpad.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                if (activeDpadTouchId === null) {
-                    activeDpadTouchId = e.changedTouches[0].identifier;
-                    updateDpadFromTouch(e.changedTouches[0]);
+                // Don't block other touches - only track this one for dpad
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touch = e.changedTouches[i];
+                    if (activeDpadTouchId === null) {
+                        activeDpadTouchId = touch.identifier;
+                        updateDpadFromTouch(touch);
+                        e.preventDefault(); // Only prevent default for dpad touch
+                    }
                 }
             }, { passive: false });
 
             dpad.addEventListener('touchmove', (e) => {
-                e.preventDefault();
                 for (let i = 0; i < e.changedTouches.length; i++) {
                     if (e.changedTouches[i].identifier === activeDpadTouchId) {
                         updateDpadFromTouch(e.changedTouches[i]);
+                        e.preventDefault();
                         break;
                     }
                 }
@@ -592,17 +599,23 @@
                         break;
                     }
                 }
-            }, { passive: false });
+            }, { passive: true });
 
             dpad.addEventListener('touchcancel', (e) => {
-                activeDpadTouchId = null;
-                clearDpadState();
-                updateKeysFromTouch();
-            });
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === activeDpadTouchId) {
+                        activeDpadTouchId = null;
+                        clearDpadState();
+                        updateKeysFromTouch();
+                        break;
+                    }
+                }
+            }, { passive: true });
         }
 
         // Action buttons touch handling with MULTI-TOUCH support
         // A = Jump, B = Dash (hold), Y = Fire
+        // 改善: タッチ移動でボタン追加検出、スライド操作対応
         function setupActionButtons() {
             const btnA = document.getElementById('btn-a');
             const btnB = document.getElementById('btn-b');
@@ -610,20 +623,82 @@
             const actionButtons = document.getElementById('actionButtons');
 
             // Track which touch IDs are on which buttons
+            // Now each touch can activate MULTIPLE buttons (for slide gestures)
             const activeTouches = {
                 a: new Set(),
                 b: new Set(),
                 y: new Set()
             };
 
+            // Track which buttons each touch has activated (for slide detection)
+            const touchToButtons = new Map(); // touchId -> Set of button names
+
+            // Get button hit with expanded touch area
             function getButtonFromPoint(x, y) {
+                // First try exact hit
                 const elements = document.elementsFromPoint(x, y);
                 for (const el of elements) {
                     if (el.id === 'btn-a') return 'a';
                     if (el.id === 'btn-b') return 'b';
                     if (el.id === 'btn-y') return 'y';
                 }
+
+                // Expanded hit detection - check if close to any button
+                const buttons = [
+                    { el: btnA, name: 'a' },
+                    { el: btnB, name: 'b' },
+                    { el: btnY, name: 'y' }
+                ];
+
+                const expandedMargin = 15; // Extra touch area around buttons
+
+                for (const btn of buttons) {
+                    if (!btn.el) continue;
+                    const rect = btn.el.getBoundingClientRect();
+                    const expandedRect = {
+                        left: rect.left - expandedMargin,
+                        right: rect.right + expandedMargin,
+                        top: rect.top - expandedMargin,
+                        bottom: rect.bottom + expandedMargin
+                    };
+
+                    if (x >= expandedRect.left && x <= expandedRect.right &&
+                        y >= expandedRect.top && y <= expandedRect.bottom) {
+                        return btn.name;
+                    }
+                }
+
                 return null;
+            }
+
+            // Get ALL buttons that a touch point is over (for multi-button press)
+            function getAllButtonsFromPoint(x, y) {
+                const result = [];
+                const buttons = [
+                    { el: btnA, name: 'a' },
+                    { el: btnB, name: 'b' },
+                    { el: btnY, name: 'y' }
+                ];
+
+                const expandedMargin = 10;
+
+                for (const btn of buttons) {
+                    if (!btn.el) continue;
+                    const rect = btn.el.getBoundingClientRect();
+                    const expandedRect = {
+                        left: rect.left - expandedMargin,
+                        right: rect.right + expandedMargin,
+                        top: rect.top - expandedMargin,
+                        bottom: rect.bottom + expandedMargin
+                    };
+
+                    if (x >= expandedRect.left && x <= expandedRect.right &&
+                        y >= expandedRect.top && y <= expandedRect.bottom) {
+                        result.push(btn.name);
+                    }
+                }
+
+                return result;
             }
 
             function updateButtonStates() {
@@ -648,29 +723,66 @@
                 updateKeysFromTouch();
             }
 
-            // Handle touch start on action buttons area
-            actionButtons.addEventListener('touchstart', (e) => {
-                for (let i = 0; i < e.changedTouches.length; i++) {
-                    const touch = e.changedTouches[i];
-                    const btn = getButtonFromPoint(touch.clientX, touch.clientY);
-                    if (btn) {
-                        activeTouches[btn].add(touch.identifier);
+            // Process a touch point - add any buttons it's touching
+            function processTouchPoint(touch, isNewTouch = false) {
+                const touchId = touch.identifier;
+                const x = touch.clientX;
+                const y = touch.clientY;
+
+                // Get all buttons this touch is over
+                const buttons = getAllButtonsFromPoint(x, y);
+
+                // Get or create the set of buttons for this touch
+                if (!touchToButtons.has(touchId)) {
+                    touchToButtons.set(touchId, new Set());
+                }
+                const currentButtons = touchToButtons.get(touchId);
+
+                // Add new buttons (don't remove - once pressed, stay pressed until touch ends)
+                for (const btn of buttons) {
+                    if (!currentButtons.has(btn)) {
+                        // New button activated by this touch
+                        currentButtons.add(btn);
+                        activeTouches[btn].add(touchId);
+
                         // Fire fireball on Y press
                         if (btn === 'y' && typeof mario !== 'undefined' && mario && !mario.isDead) {
                             mario.shootFireball();
                         }
                     }
                 }
+            }
+
+            // Remove all button states for a touch
+            function removeTouchState(touchId) {
+                activeTouches.a.delete(touchId);
+                activeTouches.b.delete(touchId);
+                activeTouches.y.delete(touchId);
+                touchToButtons.delete(touchId);
+            }
+
+            // Handle touch start on action buttons area
+            actionButtons.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // Prevent delays
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    processTouchPoint(e.changedTouches[i], true);
+                }
                 updateButtonStates();
-            }, { passive: true });
+            }, { passive: false });
+
+            // Handle touch move - KEY: detect sliding onto new buttons
+            actionButtons.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    processTouchPoint(e.changedTouches[i], false);
+                }
+                updateButtonStates();
+            }, { passive: false });
 
             // Handle touch end
             actionButtons.addEventListener('touchend', (e) => {
                 for (let i = 0; i < e.changedTouches.length; i++) {
-                    const touchId = e.changedTouches[i].identifier;
-                    activeTouches.a.delete(touchId);
-                    activeTouches.b.delete(touchId);
-                    activeTouches.y.delete(touchId);
+                    removeTouchState(e.changedTouches[i].identifier);
                 }
                 updateButtonStates();
             }, { passive: true });
@@ -678,10 +790,21 @@
             // Handle touch cancel
             actionButtons.addEventListener('touchcancel', (e) => {
                 for (let i = 0; i < e.changedTouches.length; i++) {
-                    const touchId = e.changedTouches[i].identifier;
-                    activeTouches.a.delete(touchId);
-                    activeTouches.b.delete(touchId);
-                    activeTouches.y.delete(touchId);
+                    removeTouchState(e.changedTouches[i].identifier);
+                }
+                updateButtonStates();
+            }, { passive: true });
+
+            // Global touch tracking - capture touches that start elsewhere and move to buttons
+            document.addEventListener('touchmove', (e) => {
+                for (let i = 0; i < e.touches.length; i++) {
+                    const touch = e.touches[i];
+                    // Check if this touch is now over action buttons area
+                    const rect = actionButtons.getBoundingClientRect();
+                    if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
+                        touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+                        processTouchPoint(touch, false);
+                    }
                 }
                 updateButtonStates();
             }, { passive: true });
@@ -690,10 +813,8 @@
             document.addEventListener('touchend', (e) => {
                 for (let i = 0; i < e.changedTouches.length; i++) {
                     const touchId = e.changedTouches[i].identifier;
-                    if (activeTouches.a.has(touchId) || activeTouches.b.has(touchId) || activeTouches.y.has(touchId)) {
-                        activeTouches.a.delete(touchId);
-                        activeTouches.b.delete(touchId);
-                        activeTouches.y.delete(touchId);
+                    if (touchToButtons.has(touchId)) {
+                        removeTouchState(touchId);
                         updateButtonStates();
                     }
                 }
@@ -716,41 +837,95 @@
         setupActionButtons();
 
         // ===============================
-        // iOS AUDIO FIX (Simple approach)
+        // iOS SAFARI AUDIO FIX
         // ===============================
-        // iOS Safari requires audio.play() to be called DIRECTLY in user event handler
-        // The audio element and its src must be set up, then play() called synchronously
+        // Safari requires very specific handling:
+        // 1. Audio must be played muted first, then unmuted
+        // 2. Must happen in touchend (not touchstart)
+        // 3. No async operations before play()
 
         let bgmStarted = false;
+        let bgmUnlocked = false;
+        const bgmAudioElement = document.getElementById('bgmAudio');
 
-        // This handler MUST call initAndPlayBGM directly - no wrappers, no async
-        function handleFirstInteraction(e) {
-            if (bgmStarted) return;
+        // Setup audio source
+        function setupBGMAudio() {
+            if (typeof preGeneratedBGMData !== 'undefined' && preGeneratedBGMData && bgmAudioElement) {
+                bgmAudioElement.src = preGeneratedBGMData;
+                bgmAudioElement.volume = 0.5;
+                bgmAudioElement.muted = true; // Start muted for Safari
+                bgmAudioElement.load();
+                window.bgmAudioElement = bgmAudioElement;
+                console.log('BGM configured (muted)');
+            }
+        }
 
-            console.log('First interaction:', e.type);
+        // Setup on load
+        window.addEventListener('load', setupBGMAudio);
 
-            // Call initAndPlayBGM directly from the event handler
-            if (typeof initAndPlayBGM === 'function') {
-                initAndPlayBGM();
-                bgmStarted = true;
+        // Step 1: First touch - play muted to unlock
+        function unlockAudioOnTouch(e) {
+            if (bgmUnlocked) return;
+
+            console.log('Step 1: Unlock audio (muted play)');
+
+            if (bgmAudioElement && bgmAudioElement.src) {
+                // Play muted first - this unlocks audio on Safari
+                bgmAudioElement.muted = true;
+                bgmAudioElement.play()
+                    .then(() => {
+                        console.log('Audio unlocked (playing muted)');
+                        bgmUnlocked = true;
+                    })
+                    .catch(err => {
+                        console.log('Muted play failed:', err.message);
+                    });
             }
 
-            // Also unlock Web Audio API for sound effects
+            // Also unlock Web Audio API
             if (typeof unlockAudioContext === 'function') {
                 unlockAudioContext();
             }
         }
 
-        // Attach to multiple event types for best compatibility
-        // touchend works best on iOS Safari
-        document.addEventListener('touchend', handleFirstInteraction, { capture: true, passive: true });
-        document.addEventListener('touchstart', handleFirstInteraction, { capture: true, passive: true });
-        document.addEventListener('click', handleFirstInteraction, { capture: true, passive: true });
+        // Step 2: Second touch - unmute
+        function unmuteBGM(e) {
+            if (!bgmUnlocked || bgmStarted) return;
 
-        // Handle visibility change (resume if tab becomes visible)
+            console.log('Step 2: Unmute BGM');
+
+            if (bgmAudioElement) {
+                bgmAudioElement.muted = false;
+                bgmAudioElement.volume = 0.5;
+                window.bgmIsPlaying = true;
+                bgmStarted = true;
+                console.log('BGM unmuted and playing!');
+            }
+        }
+
+        // Combined handler
+        function handleInteraction(e) {
+            if (!bgmUnlocked) {
+                unlockAudioOnTouch(e);
+                // Try to unmute after a tiny delay (same event)
+                setTimeout(() => {
+                    if (bgmUnlocked && !bgmStarted) {
+                        unmuteBGM(e);
+                    }
+                }, 100);
+            } else if (!bgmStarted) {
+                unmuteBGM(e);
+            }
+        }
+
+        // Listen on touchend for Safari
+        document.addEventListener('touchend', handleInteraction, { capture: true });
+        document.addEventListener('click', handleInteraction, { capture: true });
+
+        // Handle visibility change
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible' && window.bgmAudioElement && window.bgmIsPlaying) {
-                window.bgmAudioElement.play().catch(() => {});
+            if (document.visibilityState === 'visible' && bgmAudioElement && window.bgmIsPlaying) {
+                bgmAudioElement.play().catch(() => {});
             }
         });
 
