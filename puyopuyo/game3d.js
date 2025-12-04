@@ -1719,6 +1719,89 @@ function toggleMusic() {
 }
 
 // ========================
+// TOUCH CONTROLS
+// ========================
+
+function setupTouchControls() {
+    // D-pad controls
+    const dpadLeft = document.getElementById('dpad-left');
+    const dpadRight = document.getElementById('dpad-right');
+    const dpadDown = document.getElementById('dpad-down');
+
+    // Action buttons
+    const btnRotateLeft = document.getElementById('btn-rotate-left');
+    const btnRotateRight = document.getElementById('btn-rotate-right');
+    const btnDrop = document.getElementById('btn-drop');
+
+    // Mobile start button
+    const mobileStart = document.getElementById('mobileStart');
+
+    // Helper to handle touch events
+    function addTouchHandler(element, action) {
+        if (!element) return;
+
+        let intervalId = null;
+
+        element.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameOver || paused) return;
+            action();
+            // For continuous movement on hold (only for directional buttons)
+            if (element === dpadLeft || element === dpadRight || element === dpadDown) {
+                intervalId = setInterval(action, 100);
+            }
+        }, { passive: false });
+
+        element.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+        }, { passive: false });
+
+        element.addEventListener('touchcancel', (e) => {
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+        }, { passive: false });
+    }
+
+    // D-pad handlers
+    addTouchHandler(dpadLeft, () => movePuyo(-1, 0));
+    addTouchHandler(dpadRight, () => movePuyo(1, 0));
+    addTouchHandler(dpadDown, () => {
+        if (movePuyo(0, 1)) {
+            score += 1;
+            updateUI();
+        }
+    });
+
+    // Action button handlers
+    addTouchHandler(btnRotateLeft, () => rotatePuyo(-1));
+    addTouchHandler(btnRotateRight, () => rotatePuyo(1));
+    addTouchHandler(btnDrop, () => hardDrop());
+
+    // Mobile start button
+    if (mobileStart) {
+        mobileStart.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            mobileStart.style.display = 'none';
+            startGame();
+        }, { passive: false });
+
+        mobileStart.addEventListener('click', (e) => {
+            mobileStart.style.display = 'none';
+            startGame();
+        });
+    }
+}
+
+// Initialize touch controls
+setupTouchControls();
+
+// ========================
 // INITIALIZE
 // ========================
 

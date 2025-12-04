@@ -2,7 +2,9 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>💖 ぷよぷよ キラキラ 💖</title>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800&display=swap" rel="stylesheet">
     <style>
@@ -10,6 +12,16 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        html, body {
+            touch-action: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
         }
 
         body {
@@ -358,6 +370,186 @@
             font-size: 10px;
             font-weight: 700;
         }
+
+        /* ===============================
+           TOUCH CONTROLS
+           =============================== */
+        #touchControls {
+            display: none;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 160px;
+            z-index: 80;
+            pointer-events: none;
+        }
+
+        /* Show touch controls on touch devices */
+        @media (hover: none) and (pointer: coarse) {
+            #touchControls {
+                display: block;
+            }
+            .ui-overlay.bottom-left {
+                display: none;
+            }
+            .panel {
+                padding: 12px;
+                border-radius: 18px;
+            }
+            .panel h3 {
+                font-size: 11px;
+            }
+            .stat-value {
+                font-size: 20px;
+            }
+            h1 {
+                font-size: 18px;
+            }
+            .next-preview {
+                width: 70px;
+                height: 100px;
+            }
+        }
+
+        /* D-Pad (Left side) */
+        #dpad {
+            position: absolute;
+            left: 15px;
+            bottom: 15px;
+            width: 130px;
+            height: 130px;
+            pointer-events: auto;
+        }
+
+        .dpad-btn {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, rgba(255,182,193,0.8), rgba(255,105,180,0.6));
+            border: 3px solid rgba(255,255,255,0.9);
+            border-radius: 14px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            color: white;
+            touch-action: manipulation;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 15px rgba(255,105,180,0.4);
+        }
+
+        .dpad-btn:active, .dpad-btn.active {
+            background: linear-gradient(135deg, rgba(255,105,180,0.95), rgba(255,20,147,0.8));
+            transform: scale(0.95);
+        }
+
+        #dpad-left {
+            top: 40px;
+            left: 0;
+        }
+
+        #dpad-right {
+            top: 40px;
+            right: 0;
+        }
+
+        #dpad-down {
+            bottom: 0;
+            left: 40px;
+        }
+
+        /* Action Buttons (Right side) */
+        #actionButtons {
+            position: absolute;
+            right: 15px;
+            bottom: 15px;
+            width: 170px;
+            height: 130px;
+            pointer-events: auto;
+        }
+
+        .action-btn {
+            position: absolute;
+            width: 65px;
+            height: 65px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            touch-action: manipulation;
+            border: 3px solid rgba(255,255,255,0.7);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+        }
+
+        .action-btn:active, .action-btn.active {
+            transform: scale(0.92);
+            filter: brightness(1.2);
+        }
+
+        #btn-rotate-left {
+            background: linear-gradient(135deg, #87CEEB, #4682B4);
+            left: 0;
+            bottom: 30px;
+        }
+
+        #btn-rotate-right {
+            background: linear-gradient(135deg, #98FB98, #32CD32);
+            right: 0;
+            bottom: 30px;
+        }
+
+        #btn-drop {
+            background: linear-gradient(135deg, #FFB6C1, #FF69B4);
+            left: 52px;
+            bottom: 0;
+        }
+
+        /* Mobile start button */
+        #mobileStart {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            padding: 20px 40px;
+            z-index: 100;
+        }
+
+        @media (hover: none) and (pointer: coarse) {
+            #mobileStart {
+                display: block;
+            }
+        }
+
+        /* Small screens adjustment */
+        @media (max-height: 550px) {
+            .panel {
+                padding: 8px;
+            }
+            h1 {
+                font-size: 14px;
+            }
+            .stat-value {
+                font-size: 16px;
+            }
+            .next-preview {
+                width: 50px;
+                height: 70px;
+            }
+            #dpad, #actionButtons {
+                transform: scale(0.8);
+                transform-origin: bottom left;
+            }
+            #actionButtons {
+                transform-origin: bottom right;
+            }
+        }
     </style>
 </head>
 <body>
@@ -414,6 +606,25 @@
         <!-- Chain Popup -->
         <div class="chain-popup" id="chainPopup"></div>
 
+        <!-- Touch Controls -->
+        <div id="touchControls">
+            <!-- D-Pad -->
+            <div id="dpad">
+                <div id="dpad-left" class="dpad-btn">◀</div>
+                <div id="dpad-right" class="dpad-btn">▶</div>
+                <div id="dpad-down" class="dpad-btn">▼</div>
+            </div>
+            <!-- Action Buttons -->
+            <div id="actionButtons">
+                <div id="btn-rotate-left" class="action-btn">↺</div>
+                <div id="btn-rotate-right" class="action-btn">↻</div>
+                <div id="btn-drop" class="action-btn">DROP</div>
+            </div>
+        </div>
+
+        <!-- Mobile Start Button -->
+        <button id="mobileStart">🎀 タップしてスタート 🎀</button>
+
         <!-- Game Over -->
         <div class="game-over" id="gameOver">
             <h2>おつかれさま！</h2>
@@ -443,6 +654,23 @@
             item.style.fontSize = (20 + Math.random() * 25) + 'px';
             bgDeco.appendChild(item);
         }
+
+        // Prevent default touch behaviors
+        document.addEventListener('touchmove', (e) => {
+            if (e.target.closest('#touchControls') || e.target.closest('#gameContainer')) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        // Prevent zoom on double tap
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (e) => {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                e.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, { passive: false });
     </script>
     <script src="game3d.js"></script>
 </body>
