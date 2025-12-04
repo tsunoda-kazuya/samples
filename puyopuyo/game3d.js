@@ -1608,12 +1608,12 @@ function animate(timestamp) {
     // Update legacy particles
     updateParticles();
 
-    // Gentle camera sway
-    if (!paused && !gameOver) {
-        const mode = cameraModes[cameraMode];
-        camera.position.x = mode.pos.x + Math.sin(bounceTime * 0.3) * 0.15;
-        camera.position.y = mode.pos.y + Math.cos(bounceTime * 0.2) * 0.08;
-    }
+    // Camera sway disabled for stability
+    // if (!paused && !gameOver) {
+    //     const mode = cameraModes[cameraMode];
+    //     camera.position.x = mode.pos.x + Math.sin(bounceTime * 0.3) * 0.15;
+    //     camera.position.y = mode.pos.y + Math.cos(bounceTime * 0.2) * 0.08;
+    // }
 
     // Game logic
     if (!paused && !gameOver && !animating && currentPuyo) {
@@ -1736,18 +1736,18 @@ function setupTouchControls() {
     // Mobile start button
     const mobileStart = document.getElementById('mobileStart');
 
-    // Helper to handle touch events
-    function addTouchHandler(element, action) {
+    // Helper to handle touch and click events
+    function addTouchHandler(element, action, isDirectional = false) {
         if (!element) return;
 
         let intervalId = null;
 
+        // Touch events
         element.addEventListener('touchstart', (e) => {
             e.preventDefault();
             if (gameOver || paused) return;
             action();
-            // For continuous movement on hold (only for directional buttons)
-            if (element === dpadLeft || element === dpadRight || element === dpadDown) {
+            if (isDirectional) {
                 intervalId = setInterval(action, 100);
             }
         }, { passive: false });
@@ -1766,6 +1766,30 @@ function setupTouchControls() {
                 intervalId = null;
             }
         }, { passive: false });
+
+        // Mouse click events for PC
+        element.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            if (gameOver || paused) return;
+            action();
+            if (isDirectional) {
+                intervalId = setInterval(action, 100);
+            }
+        });
+
+        element.addEventListener('mouseup', (e) => {
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+        });
+
+        element.addEventListener('mouseleave', (e) => {
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+        });
     }
 
     // D-pad handlers
