@@ -395,27 +395,29 @@
         }
         */
 
+        /* PC only elements */
+        .pc-only {
+            display: block;
+        }
+
         /* Mobile adjustments */
         @media (max-width: 900px) {
-            .ui-overlay.bottom-left {
-                display: none;
+            .pc-only {
+                display: none !important;
             }
             .panel {
-                padding: 12px;
-                border-radius: 18px;
+                padding: 8px;
+                border-radius: 12px;
             }
             .panel h3 {
-                font-size: 11px;
+                font-size: 10px;
             }
             .stat-value {
-                font-size: 20px;
-            }
-            h1 {
                 font-size: 18px;
             }
             .next-preview {
-                width: 70px;
-                height: 100px;
+                width: 50px;
+                height: 75px;
             }
         }
 
@@ -582,7 +584,7 @@
         <canvas id="gameCanvas"></canvas>
 
         <!-- Version -->
-        <div style="position:absolute;top:5px;left:50%;transform:translateX(-50%);font-size:10px;color:#ff69b4;z-index:200;font-weight:bold;">v2.0</div>
+        <div style="position:absolute;top:5px;left:50%;transform:translateX(-50%);font-size:10px;color:#ff69b4;z-index:200;font-weight:bold;">v2.1</div>
 
         <!-- Score and Next Panel (Right side) -->
         <div class="ui-overlay top-right">
@@ -598,8 +600,8 @@
             </div>
         </div>
 
-        <!-- Controls -->
-        <div class="ui-overlay bottom-left">
+        <!-- Controls (PC only) -->
+        <div class="ui-overlay bottom-left pc-only">
             <div class="panel">
                 <h3>あそびかた</h3>
                 <div class="controls">
@@ -607,7 +609,6 @@
                     <p><span>↓</span> はやくおとす</p>
                     <p><span>Z X</span> まわす</p>
                     <p><span>スペース</span> いっきにおとす</p>
-                    <p><span>C</span> カメラきりかえ</p>
                 </div>
                 <div class="buttons">
                     <button id="startBtn">🎀 スタート 🎀</button>
