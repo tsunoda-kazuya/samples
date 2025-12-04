@@ -42,11 +42,14 @@ let cameraMode = 0;
 // Adjusted camera distance for mobile - further back to fit more on screen
 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
 // Mobile: move camera down to show board higher on screen (lower cameraY = board appears higher)
+// Shift camera/lookAt x position left to compensate for right UI panel
 const cameraZ = isMobile ? 16 : 15;
 const cameraY = isMobile ? 4 : 6;  // Lower camera position
 const lookAtY = isMobile ? 5 : 6;  // Look slightly up
+const cameraX = isMobile ? 2.5 : 3;  // Shift slightly left on mobile to center board visually
+const lookAtX = isMobile ? 2.5 : 3;  // Match camera shift
 const cameraModes = [
-    { pos: { x: 3, y: cameraY, z: cameraZ }, lookAt: { x: 3, y: lookAtY, z: 0 } },
+    { pos: { x: cameraX, y: cameraY, z: cameraZ }, lookAt: { x: lookAtX, y: lookAtY, z: 0 } },
     { pos: { x: 12, y: 6, z: 12 }, lookAt: { x: 3, y: 6, z: 0 } },
     { pos: { x: 3, y: 15, z: 10 }, lookAt: { x: 3, y: 6, z: 0 } },
     { pos: { x: -5, y: 8, z: 14 }, lookAt: { x: 3, y: 6, z: 0 } }
@@ -2040,6 +2043,67 @@ function setupTouchControls() {
     addMouseHandler(btnRotateLeft, () => rotatePuyo(-1));
     addMouseHandler(btnRotateRight, () => rotatePuyo(1));
     addMouseHandler(btnDrop, () => hardDrop());
+
+    // Pause button (touch control area)
+    const btnPause = document.getElementById('btn-pause');
+    if (btnPause) {
+        btnPause.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            togglePause();
+            btnPause.textContent = paused ? 'PLAY' : 'STOP';
+        }, { passive: false });
+        btnPause.addEventListener('click', () => {
+            togglePause();
+            btnPause.textContent = paused ? 'PLAY' : 'STOP';
+        });
+    }
+
+    // Mobile top bar buttons
+    const mobileStartBtn2 = document.getElementById('mobileStartBtn2');
+    const mobilePauseBtn = document.getElementById('mobilePauseBtn');
+    const mobileMuteBtn = document.getElementById('mobileMuteBtn');
+
+    if (mobileStartBtn2) {
+        mobileStartBtn2.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            startGame();
+            const mobileStart = document.getElementById('mobileStart');
+            if (mobileStart) mobileStart.style.display = 'none';
+        }, { passive: false });
+        mobileStartBtn2.addEventListener('click', () => {
+            startGame();
+            const mobileStart = document.getElementById('mobileStart');
+            if (mobileStart) mobileStart.style.display = 'none';
+        });
+    }
+
+    if (mobilePauseBtn) {
+        mobilePauseBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            togglePause();
+            mobilePauseBtn.textContent = paused ? 'PLAY' : 'PAUSE';
+            const btnPause = document.getElementById('btn-pause');
+            if (btnPause) btnPause.textContent = paused ? 'PLAY' : 'STOP';
+        }, { passive: false });
+        mobilePauseBtn.addEventListener('click', () => {
+            togglePause();
+            mobilePauseBtn.textContent = paused ? 'PLAY' : 'PAUSE';
+            const btnPause = document.getElementById('btn-pause');
+            if (btnPause) btnPause.textContent = paused ? 'PLAY' : 'STOP';
+        });
+    }
+
+    if (mobileMuteBtn) {
+        mobileMuteBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            toggleMusic();
+            mobileMuteBtn.textContent = musicEnabled ? 'MUTE' : 'SOUND';
+        }, { passive: false });
+        mobileMuteBtn.addEventListener('click', () => {
+            toggleMusic();
+            mobileMuteBtn.textContent = musicEnabled ? 'MUTE' : 'SOUND';
+        });
+    }
 }
 
 // Initialize touch controls
