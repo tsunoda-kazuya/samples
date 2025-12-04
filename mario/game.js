@@ -4117,26 +4117,43 @@ function generateLevel(useSameSeed = false) {
     // ================================
 
     // Rules for pipes:
-    // - Height: 2-4 tiles (all jumpable)
+    // - Height: 2-3 tiles ONLY (guaranteed jumpable - Mario can jump 4 tiles high)
     // - Not near gaps (need 5+ tiles of ground before and after)
-    // - Minimum 8 tiles between pipes
+    // - Minimum 12 tiles between pipes (enough run-up space)
+    // - Never place tall pipes consecutively
 
     let lastPipeX = 0;
+    let lastPipeHeight = 0;
     x = 15;
 
     while (x < levelWidth - 25) {
-        if (seededRandom() < 0.12 && x - lastPipeX >= 10) {
+        if (seededRandom() < 0.10 && x - lastPipeX >= 12) {
             // Check if safe to place pipe (no nearby gaps)
             let safeToPlace = true;
-            for (let check = x - 3; check <= x + 4; check++) {
+            for (let check = x - 4; check <= x + 5; check++) {
                 if (check >= 0 && check < levelWidth && !groundMap[check]) {
                     safeToPlace = false;
                     break;
                 }
             }
 
+            // Also check no other obstacle nearby
+            for (let check = x - 3; check <= x + 3; check++) {
+                if (check >= 0 && check < levelWidth && obstacleMap[check] > 0) {
+                    safeToPlace = false;
+                    break;
+                }
+            }
+
             if (safeToPlace) {
-                const pipeHeight = randomInt(2, 4);
+                // Height: 2-3 tiles MAX (both are easily jumpable)
+                // If last pipe was 3, make this one 2
+                let pipeHeight;
+                if (lastPipeHeight >= 3) {
+                    pipeHeight = 2;
+                } else {
+                    pipeHeight = randomInt(2, 3);
+                }
 
                 // Record obstacle height
                 obstacleMap[x] = pipeHeight;
@@ -4155,7 +4172,8 @@ function generateLevel(useSameSeed = false) {
 
                 pipePositions.push(x);
                 lastPipeX = x;
-                x += randomInt(10, 18);
+                lastPipeHeight = pipeHeight;
+                x += randomInt(12, 20); // More space between pipes
             } else {
                 x++;
             }
@@ -4309,7 +4327,66 @@ function generateLevel(useSameSeed = false) {
     }
 
     // ================================
-    // STEP 5: Goal stairs (always same structure)
+    // STEP 5: Validate map passability
+    // ================================
+
+    // Remove any obstacles that would block progress
+    // Mario can jump ~4 tiles high, so anything taller is a problem
+    // Also ensure there's enough run-up space before obstacles
+
+    const MAX_JUMPABLE_HEIGHT = 3; // tiles
+
+    // Check each section of the map for passability
+    for (let checkX = 5; checkX < levelWidth - 20; checkX++) {
+        const obstacleHeight = obstacleMap[checkX];
+
+        if (obstacleHeight > MAX_JUMPABLE_HEIGHT) {
+            // This obstacle is too tall - remove it
+            platforms = platforms.filter(p => {
+                const pTileX = Math.floor(p.x / TILE_SIZE);
+                return !(pTileX >= checkX - 1 && pTileX <= checkX + 2 &&
+                         (p.type === 'pipe' || p.type === 'pipe-top'));
+            });
+            obstacleMap[checkX] = 0;
+            obstacleMap[checkX + 1] = 0;
+        }
+
+        // Check for impassable combinations (obstacle right after gap)
+        if (!groundMap[checkX - 1] && obstacleHeight > 0) {
+            // Gap followed immediately by obstacle - remove obstacle
+            platforms = platforms.filter(p => {
+                const pTileX = Math.floor(p.x / TILE_SIZE);
+                return !(pTileX >= checkX && pTileX <= checkX + 1 &&
+                         (p.type === 'pipe' || p.type === 'pipe-top'));
+            });
+            obstacleMap[checkX] = 0;
+            obstacleMap[checkX + 1] = 0;
+        }
+
+        // Ensure minimum run-up space before tall obstacles
+        if (obstacleHeight >= 3) {
+            let hasRunUp = true;
+            for (let runCheck = checkX - 4; runCheck < checkX; runCheck++) {
+                if (runCheck >= 0 && (!groundMap[runCheck] || obstacleMap[runCheck] > 0)) {
+                    hasRunUp = false;
+                    break;
+                }
+            }
+            if (!hasRunUp) {
+                // Not enough run-up - remove this obstacle
+                platforms = platforms.filter(p => {
+                    const pTileX = Math.floor(p.x / TILE_SIZE);
+                    return !(pTileX >= checkX && pTileX <= checkX + 1 &&
+                             (p.type === 'pipe' || p.type === 'pipe-top'));
+                });
+                obstacleMap[checkX] = 0;
+                obstacleMap[checkX + 1] = 0;
+            }
+        }
+    }
+
+    // ================================
+    // STEP 6: Goal stairs (always same structure)
     // ================================
 
     const stairStartX = levelWidth - 15;
@@ -4329,7 +4406,7 @@ function generateLevel(useSameSeed = false) {
     GOAL_X = (stairStartX + 8) * TILE_SIZE;
 
     // ================================
-    // STEP 6: Place enemies safely
+    // STEP 7: Place enemies safely
     // ================================
 
     // Difficulty scales with level number (1-10)
