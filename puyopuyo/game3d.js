@@ -39,11 +39,14 @@ let musicEnabled = true;
 
 // Camera settings
 let cameraMode = 0;
+// Adjusted camera distance for mobile - further back to fit more on screen
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+const cameraZ = isMobile ? 18 : 15;
 const cameraModes = [
-    { pos: { x: 3, y: 6, z: 15 }, lookAt: { x: 3, y: 6, z: 0 } },
-    { pos: { x: 12, y: 6, z: 10 }, lookAt: { x: 3, y: 6, z: 0 } },
-    { pos: { x: 3, y: 15, z: 8 }, lookAt: { x: 3, y: 6, z: 0 } },
-    { pos: { x: -5, y: 8, z: 12 }, lookAt: { x: 3, y: 6, z: 0 } }
+    { pos: { x: 3, y: 6, z: cameraZ }, lookAt: { x: 3, y: 6, z: 0 } },
+    { pos: { x: 12, y: 6, z: 12 }, lookAt: { x: 3, y: 6, z: 0 } },
+    { pos: { x: 3, y: 15, z: 10 }, lookAt: { x: 3, y: 6, z: 0 } },
+    { pos: { x: -5, y: 8, z: 14 }, lookAt: { x: 3, y: 6, z: 0 } }
 ];
 
 // Animation
@@ -1472,8 +1475,8 @@ function renderNext() {
     nextCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
 
     if (nextPuyo) {
-        drawPuyo2D(nextCtx, 40, 80, nextPuyo.color1, 32);
-        drawPuyo2D(nextCtx, 40, 40, nextPuyo.color2, 32);
+        drawPuyo2D(nextCtx, 28, 58, nextPuyo.color1, 24);
+        drawPuyo2D(nextCtx, 28, 28, nextPuyo.color2, 24);
     }
 }
 
@@ -1592,12 +1595,13 @@ function animate(timestamp) {
         }
     });
 
-    // Update sparkle particles
+    // Update sparkle particles - rotation only, no position changes for stability
     sparkleParticles.forEach(sparkle => {
-        sparkle.rotation.x += 0.02;
-        sparkle.rotation.y += 0.03;
-        const floatY = Math.sin(bounceTime * sparkle.userData.speed + sparkle.userData.offset) * 0.5;
-        sparkle.position.y = sparkle.userData.originalY + floatY;
+        sparkle.rotation.x += 0.01;
+        sparkle.rotation.y += 0.01;
+        // Float animation disabled for stability
+        // const floatY = Math.sin(bounceTime * sparkle.userData.speed + sparkle.userData.offset) * 0.5;
+        // sparkle.position.y = sparkle.userData.originalY + floatY;
         // Twinkle effect
         sparkle.material.opacity = 0.5 + Math.sin(bounceTime * 3 + sparkle.userData.offset) * 0.5;
     });
@@ -1792,20 +1796,20 @@ function setupTouchControls() {
         });
     }
 
-    // D-pad handlers
-    addTouchHandler(dpadLeft, () => movePuyo(-1, 0));
-    addTouchHandler(dpadRight, () => movePuyo(1, 0));
+    // D-pad handlers (directional = true for continuous movement)
+    addTouchHandler(dpadLeft, () => movePuyo(-1, 0), true);
+    addTouchHandler(dpadRight, () => movePuyo(1, 0), true);
     addTouchHandler(dpadDown, () => {
         if (movePuyo(0, 1)) {
             score += 1;
             updateUI();
         }
-    });
+    }, true);
 
-    // Action button handlers
-    addTouchHandler(btnRotateLeft, () => rotatePuyo(-1));
-    addTouchHandler(btnRotateRight, () => rotatePuyo(1));
-    addTouchHandler(btnDrop, () => hardDrop());
+    // Action button handlers (not directional)
+    addTouchHandler(btnRotateLeft, () => rotatePuyo(-1), false);
+    addTouchHandler(btnRotateRight, () => rotatePuyo(1), false);
+    addTouchHandler(btnDrop, () => hardDrop(), false);
 
     // Mobile start button
     if (mobileStart) {
