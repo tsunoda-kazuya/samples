@@ -22,7 +22,6 @@
             position: fixed;
             width: 100%;
             height: 100%;
-            overflow: hidden;
         }
 
         body {
@@ -31,10 +30,13 @@
                 #fff0f5 30%,
                 #e6f0ff 60%,
                 #f0e6ff 100%);
+            min-height: 100vh;
             display: flex;
-            flex-direction: column;
+            justify-content: center;
+            align-items: center;
             font-family: 'M PLUS Rounded 1c', sans-serif;
             color: #ff69b4;
+            overflow: hidden;
         }
 
         /* Floating hearts and stars background */
@@ -63,41 +65,20 @@
             100% { transform: translateY(-100px) rotate(360deg); opacity: 0; }
         }
 
-        /* Main game layout */
-        .game-wrapper {
+        #gameContainer {
             position: relative;
+            width: 100vw;
+            height: 100vh;
             z-index: 1;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            padding: 2px;
-        }
-
-        /* Top area: game board + side panel */
-        .top-area {
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            gap: 8px;
-        }
-
-        .game-board-container {
-            position: relative;
         }
 
         #gameCanvas {
-            border: 4px solid #ff69b4;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(255, 105, 180, 0.4);
-            background: rgba(255, 255, 255, 0.9);
             display: block;
         }
 
-        /* Side panel */
-        .side-panel {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
+        .ui-overlay {
+            position: absolute;
+            pointer-events: none;
         }
 
         .panel {
@@ -105,32 +86,87 @@
                 rgba(255, 255, 255, 0.95) 0%,
                 rgba(255, 240, 245, 0.95) 100%);
             border: 3px solid #ffb6c1;
-            border-radius: 12px;
-            padding: 8px;
-            text-align: center;
+            border-radius: 15px;
+            padding: 10px;
+            backdrop-filter: blur(10px);
+            pointer-events: auto;
             box-shadow:
                 0 4px 16px rgba(255, 105, 180, 0.2),
                 inset 0 1px 5px rgba(255, 255, 255, 0.8);
         }
 
+        .top-left {
+            top: 5px;
+            left: 5px;
+        }
+
+        .top-right {
+            top: 5px;
+            right: 5px;
+        }
+
+        .bottom-left {
+            bottom: 140px;
+            left: 5px;
+        }
+
+        h1 {
+            font-size: 18px;
+            margin-bottom: 5px;
+            background: linear-gradient(45deg, #ff69b4, #ff1493, #da70d6, #ff69b4);
+            background-size: 300% 300%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: rainbow 3s ease infinite;
+            text-shadow: none;
+            letter-spacing: 2px;
+        }
+
+        @keyframes rainbow {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .title-deco {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .title-deco::before,
+        .title-deco::after {
+            content: '✨';
+            font-size: 20px;
+            animation: sparkle 1s infinite;
+        }
+
+        @keyframes sparkle {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.7; }
+        }
+
         .panel h3 {
-            font-size: 10px;
-            color: #ff69b4;
+            font-size: 11px;
             margin-bottom: 4px;
+            color: #ff69b4;
+            display: flex;
+            align-items: center;
+            gap: 4px;
         }
 
         .panel h3::before {
-            content: '♡ ';
+            content: '♡';
+            font-size: 12px;
         }
 
-        #nextCanvas {
-            border: 2px dashed #ffb6c1;
-            border-radius: 8px;
-            background: linear-gradient(135deg, #fff0f5, #ffe6ff);
+        .panel p {
+            font-size: 12px;
+            margin: 3px 0;
         }
 
         .stat-value {
-            font-size: 16px;
+            font-size: 20px;
             font-weight: 800;
             background: linear-gradient(45deg, #ff69b4, #da70d6);
             -webkit-background-clip: text;
@@ -138,21 +174,259 @@
             background-clip: text;
         }
 
-        /* Touch controls */
-        .touch-controls {
-            flex: 1;
+        .next-preview {
+            width: 60px;
+            height: 90px;
+            background: linear-gradient(135deg, #fff0f5, #ffe6ff);
+            border-radius: 10px;
+            margin-top: 5px;
+            border: 2px dashed #ffb6c1;
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
             align-items: center;
-            padding: 10px 15px;
-            min-height: 130px;
         }
 
-        /* D-Pad */
+        #nextCanvas {
+            border-radius: 12px;
+        }
+
+        .controls {
+            font-size: 12px;
+            line-height: 2.2;
+            color: #db7093;
+        }
+
+        .controls span {
+            display: inline-block;
+            background: linear-gradient(135deg, #ffb6c1, #ffc0cb);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 700;
+            margin-right: 5px;
+            box-shadow: 0 2px 5px rgba(255, 105, 180, 0.3);
+        }
+
+        .buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        button {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 30px;
+            background: linear-gradient(135deg, #ff69b4, #ff1493);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow:
+                0 6px 20px rgba(255, 105, 180, 0.4),
+                inset 0 2px 10px rgba(255, 255, 255, 0.3);
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            transition: left 0.5s;
+        }
+
+        button:hover::before {
+            left: 100%;
+        }
+
+        button:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow:
+                0 10px 30px rgba(255, 105, 180, 0.5),
+                inset 0 2px 10px rgba(255, 255, 255, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0) scale(0.98);
+        }
+
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg,
+                rgba(255, 255, 255, 0.98) 0%,
+                rgba(255, 240, 250, 0.98) 100%);
+            padding: 45px;
+            border-radius: 35px;
+            text-align: center;
+            display: none;
+            border: 5px solid #ffb6c1;
+            box-shadow:
+                0 20px 60px rgba(255, 105, 180, 0.3),
+                inset 0 2px 20px rgba(255, 255, 255, 0.8);
+            pointer-events: auto;
+            z-index: 100;
+        }
+
+        .game-over h2 {
+            font-size: 36px;
+            margin-bottom: 25px;
+            background: linear-gradient(45deg, #ff69b4, #ff1493, #da70d6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .game-over p {
+            margin: 12px 0;
+            font-size: 16px;
+            color: #db7093;
+        }
+
+        .game-over .stat-value {
+            font-size: 32px;
+        }
+
+        .game-over::before {
+            content: '💖';
+            font-size: 50px;
+            display: block;
+            margin-bottom: 15px;
+            animation: bounce 1s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .chain-popup {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 52px;
+            font-weight: 800;
+            background: linear-gradient(45deg, #ff69b4, #ff1493, #da70d6, #ff69b4);
+            background-size: 300% 300%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: rainbow 1s ease infinite;
+            pointer-events: none;
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            text-shadow: none;
+            filter: drop-shadow(0 0 20px rgba(255, 105, 180, 0.8));
+        }
+
+        .chain-popup.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1.3);
+        }
+
+        /* Cute decorative elements */
+        .deco-star {
+            position: absolute;
+            font-size: 24px;
+            animation: twinkle 2s infinite;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.5; transform: scale(1) rotate(0deg); }
+            50% { opacity: 1; transform: scale(1.2) rotate(180deg); }
+        }
+
+        /* Ribbon decoration */
+        .ribbon {
+            position: absolute;
+            top: -15px;
+            right: -15px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #ff69b4, #ff1493);
+            transform: rotate(45deg);
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            padding-bottom: 5px;
+            box-shadow: 0 3px 10px rgba(255, 105, 180, 0.4);
+        }
+
+        .ribbon span {
+            transform: rotate(-45deg);
+            color: white;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        /* ===============================
+           TOUCH CONTROLS
+           =============================== */
+        #touchControls {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            height: auto;
+            z-index: 80;
+            pointer-events: none;
+        }
+
+        /* Hide on desktop (mouse devices) - DISABLED FOR TESTING
+        @media (hover: hover) and (pointer: fine) {
+            #touchControls {
+                display: none !important;
+            }
+        }
+        */
+
+        /* PC only elements */
+        .pc-only {
+            display: block;
+        }
+
+        /* Mobile adjustments */
+        @media (max-width: 900px) {
+            .pc-only {
+                display: none !important;
+            }
+            .panel {
+                padding: 8px;
+                border-radius: 12px;
+            }
+            .panel h3 {
+                font-size: 10px;
+            }
+            .stat-value {
+                font-size: 18px;
+            }
+            .next-preview {
+                width: 50px;
+                height: 75px;
+            }
+        }
+
+        /* D-Pad (Left side) */
         #dpad {
             position: relative;
             width: 120px;
             height: 120px;
+            pointer-events: auto;
         }
 
         .dpad-btn {
@@ -165,14 +439,15 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 20px;
+            font-size: 22px;
             color: white;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
-            box-shadow: 0 4px 15px rgba(255,105,180,0.5);
+            touch-action: manipulation;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.4);
+            box-shadow: 0 4px 15px rgba(255,105,180,0.6);
         }
 
         .dpad-btn:active, .dpad-btn.active {
-            background: linear-gradient(135deg, #FF69B4, #FF1493);
+            background: linear-gradient(135deg, rgba(255,105,180,0.95), rgba(255,20,147,0.8));
             transform: scale(0.95);
         }
 
@@ -191,11 +466,12 @@
             left: 38px;
         }
 
-        /* Action Buttons */
+        /* Action Buttons (Right side) */
         #actionButtons {
             position: relative;
             width: 130px;
             height: 120px;
+            pointer-events: auto;
         }
 
         .action-btn {
@@ -209,9 +485,10 @@
             font-size: 12px;
             font-weight: bold;
             color: white;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.4);
+            touch-action: manipulation;
             border: 3px solid white;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.35);
         }
 
         .action-btn:active, .action-btn.active {
@@ -237,127 +514,40 @@
             bottom: 0;
         }
 
-        /* Menu buttons */
-        .menu-buttons {
-            display: flex;
-            gap: 8px;
-            padding: 5px 10px;
-            justify-content: center;
-        }
-
-        .menu-btn {
-            padding: 8px 14px;
-            font-size: 11px;
-            font-weight: bold;
-            border: 2px solid #ff69b4;
-            border-radius: 20px;
-            background: white;
-            color: #ff69b4;
-            font-family: inherit;
-        }
-
-        .menu-btn:active {
-            background: #ff69b4;
-            color: white;
-        }
-
-        /* Chain popup */
-        .chain-popup {
-            position: fixed;
-            top: 30%;
+        /* Mobile start button */
+        #mobileStart {
+            display: block;
+            position: absolute;
+            top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 40px;
-            font-weight: 800;
-            background: linear-gradient(45deg, #ff69b4, #ff1493, #da70d6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            pointer-events: none;
-            opacity: 0;
-            transition: all 0.3s;
-            z-index: 50;
-            filter: drop-shadow(0 0 10px rgba(255, 105, 180, 0.8));
-        }
-
-        .chain-popup.show {
-            opacity: 1;
-            transform: translate(-50%, -50%) scale(1.2);
-        }
-
-        /* Game over overlay */
-        .game-over {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(255, 240, 245, 0.95);
-            display: none;
-            justify-content: center;
-            align-items: center;
+            font-size: 18px;
+            padding: 20px 40px;
             z-index: 100;
         }
 
-        .game-over.show {
-            display: flex;
-        }
-
-        .game-over-content {
-            background: white;
-            padding: 30px 40px;
-            border-radius: 25px;
-            text-align: center;
-            border: 4px solid #ff69b4;
-            box-shadow: 0 10px 40px rgba(255, 105, 180, 0.4);
-        }
-
-        .game-over h2 {
-            font-size: 28px;
-            color: #ff1493;
-            margin-bottom: 20px;
-        }
-
-        .game-over h2::before {
-            content: '💖 ';
-        }
-
-        .game-over h2::after {
-            content: ' 💖';
-        }
-
-        .game-over p {
-            font-size: 14px;
-            margin: 8px 0;
-            color: #ff69b4;
-        }
-
-        .game-over .stat-value {
-            font-size: 28px;
-        }
-
-        .game-over .menu-btn {
-            margin-top: 20px;
-            padding: 12px 30px;
-            font-size: 16px;
-        }
-
-        /* Desktop layout */
-        @media (min-width: 500px) and (min-height: 700px) {
-            body {
-                justify-content: center;
-                align-items: center;
-            }
-            .game-wrapper {
-                max-width: 400px;
+        /* Hide on desktop - DISABLED FOR TESTING
+        @media (hover: hover) and (pointer: fine) {
+            #mobileStart {
+                display: none;
             }
         }
+        */
 
-        /* Very small screens */
+        /* Small screens adjustment */
         @media (max-height: 550px) {
-            .touch-controls {
-                min-height: 100px;
-                padding: 5px 10px;
+            .panel {
+                padding: 8px;
+            }
+            h1 {
+                font-size: 14px;
+            }
+            .stat-value {
+                font-size: 16px;
+            }
+            .next-preview {
+                width: 50px;
+                height: 70px;
             }
             #dpad {
                 width: 100px;
@@ -366,7 +556,7 @@
             .dpad-btn {
                 width: 38px;
                 height: 38px;
-                font-size: 16px;
+                font-size: 18px;
             }
             #dpad-left { top: 31px; left: 0; }
             #dpad-right { top: 31px; right: 0; }
@@ -390,79 +580,101 @@
     <!-- Floating background decorations -->
     <div class="bg-decoration" id="bgDeco"></div>
 
-    <div class="game-wrapper">
-        <div class="menu-buttons">
-            <button class="menu-btn" id="startBtn">🎀 START</button>
-            <button class="menu-btn" id="pauseBtn">⏸ PAUSE</button>
-            <button class="menu-btn" id="muteBtn">🎵 ON</button>
-        </div>
-        <div class="top-area">
-            <div class="game-board-container">
-                <canvas id="gameCanvas"></canvas>
-            </div>
-            <div class="side-panel">
-                <div class="panel">
-                    <h3>つぎ</h3>
-                    <canvas id="nextCanvas" width="60" height="90"></canvas>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Version -->
+        <div style="position:absolute;top:5px;left:50%;transform:translateX(-50%);font-size:10px;color:#ff69b4;z-index:200;font-weight:bold;">v2.5</div>
+
+        <!-- Score and Next Panel (Right side) -->
+        <div class="ui-overlay top-right">
+            <div class="panel" style="position: relative; overflow: hidden;">
+                <h3>つぎ</h3>
+                <div class="next-preview">
+                    <canvas id="nextCanvas" width="55" height="85"></canvas>
                 </div>
-                <div class="panel">
-                    <h3>スコア</h3>
-                    <p class="stat-value" id="score">0</p>
-                </div>
-                <div class="panel">
-                    <h3>れんさ</h3>
-                    <p class="stat-value" id="chains">0</p>
-                </div>
+                <h3 style="margin-top: 6px;">スコア</h3>
+                <p class="stat-value" id="score">0</p>
+                <h3 style="margin-top: 6px;">れんさ</h3>
+                <p class="stat-value" id="chains">0</p>
             </div>
         </div>
-        <div class="touch-controls">
+
+        <!-- Controls (PC only) -->
+        <div class="ui-overlay bottom-left pc-only">
+            <div class="panel">
+                <h3>あそびかた</h3>
+                <div class="controls">
+                    <p><span>← →</span> うごかす</p>
+                    <p><span>↓</span> はやくおとす</p>
+                    <p><span>Z X</span> まわす</p>
+                    <p><span>スペース</span> いっきにおとす</p>
+                </div>
+                <div class="buttons">
+                    <button id="startBtn">🎀 スタート 🎀</button>
+                    <button id="pauseBtn">⏸ おやすみ</button>
+                    <button id="muteBtn">🎵 おんがく ON</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chain Popup -->
+        <div class="chain-popup" id="chainPopup"></div>
+
+        <!-- Touch Controls -->
+        <div id="touchControls">
+            <!-- D-Pad -->
             <div id="dpad">
                 <div id="dpad-left" class="dpad-btn">◀</div>
                 <div id="dpad-right" class="dpad-btn">▶</div>
                 <div id="dpad-down" class="dpad-btn">▼</div>
             </div>
+            <!-- Action Buttons -->
             <div id="actionButtons">
                 <div id="btn-rotate-left" class="action-btn">↺</div>
                 <div id="btn-rotate-right" class="action-btn">↻</div>
                 <div id="btn-drop" class="action-btn">DROP</div>
             </div>
         </div>
-    </div>
 
-    <!-- Chain Popup -->
-    <div class="chain-popup" id="chainPopup"></div>
+        <!-- Mobile Start Button -->
+        <button id="mobileStart">🎀 タップしてスタート 🎀</button>
 
-    <!-- Game Over -->
-    <div class="game-over" id="gameOver">
-        <div class="game-over-content">
-            <h2>おつかれさま</h2>
+        <!-- Game Over -->
+        <div class="game-over" id="gameOver">
+            <h2>おつかれさま！</h2>
             <p>スコア</p>
             <p class="stat-value" id="finalScore">0</p>
-            <p style="margin-top: 15px;">さいこうれんさ</p>
+            <p style="margin-top: 20px;">さいこうれんさ</p>
             <p class="stat-value" id="maxChain">0</p>
-            <button class="menu-btn" id="restartBtn">🌟 もういっかい 🌟</button>
+            <div class="buttons" style="margin-top: 25px;">
+                <button id="restartBtn">🌟 もういっかい 🌟</button>
+            </div>
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
         // Create floating background decorations
         const bgDeco = document.getElementById('bgDeco');
         const decorations = ['💖', '⭐', '🌸', '✨', '💕', '🎀', '🌟', '💗', '🦋', '🌈'];
 
-        for (let i = 0; i < 20; i++) {
+        for (let i = 0; i < 30; i++) {
             const item = document.createElement('div');
             item.className = 'floating-item';
             item.textContent = decorations[Math.floor(Math.random() * decorations.length)];
             item.style.left = Math.random() * 100 + '%';
             item.style.animationDelay = Math.random() * 15 + 's';
             item.style.animationDuration = (15 + Math.random() * 10) + 's';
-            item.style.fontSize = (20 + Math.random() * 20) + 'px';
+            item.style.fontSize = (20 + Math.random() * 25) + 'px';
             bgDeco.appendChild(item);
         }
 
         // Prevent default touch behaviors
         document.addEventListener('touchmove', (e) => {
-            e.preventDefault();
+            if (e.target.closest('#touchControls') || e.target.closest('#gameContainer')) {
+                e.preventDefault();
+            }
         }, { passive: false });
 
         // Prevent zoom on double tap
@@ -475,6 +687,6 @@
             lastTouchEnd = now;
         }, { passive: false });
     </script>
-    <script src="game2d.js"></script>
+    <script src="game3d.js"></script>
 </body>
 </html>
