@@ -45,26 +45,40 @@ let musicPlayer = null;
 // ========================
 
 function resizeCanvas() {
-    const container = document.getElementById('gameContainer');
-    const maxWidth = window.innerWidth;
-    const maxHeight = window.innerHeight;
+    const menuButtons = document.querySelector('.menu-buttons');
+    const touchControls = document.querySelector('.touch-controls');
 
-    // Calculate cell size based on available space
-    const availableWidth = maxWidth * 0.5;
-    const availableHeight = maxHeight * 0.85;
+    const windowHeight = window.innerHeight;
+    const windowWidth = window.innerWidth;
 
-    cellSize = Math.min(
-        Math.floor(availableWidth / COLS),
-        Math.floor(availableHeight / ROWS),
-        50
-    );
+    const menuHeight = menuButtons ? menuButtons.offsetHeight : 40;
+    const touchHeight = touchControls ? Math.max(130, touchControls.offsetHeight) : 130;
+    const sidePanelWidth = 80; // approximate width of side panel
+    const padding = 30;
 
-    canvas.width = maxWidth;
-    canvas.height = maxHeight;
+    // Available space for game board
+    const availableHeight = windowHeight - menuHeight - touchHeight - padding;
+    const availableWidth = windowWidth - sidePanelWidth - padding;
 
-    // Center the board
-    boardOffsetX = (canvas.width - COLS * cellSize) / 2;
-    boardOffsetY = (canvas.height - ROWS * cellSize) / 2;
+    // Calculate cell size to fit
+    const cellByHeight = Math.floor(availableHeight / ROWS);
+    const cellByWidth = Math.floor(availableWidth / COLS);
+
+    cellSize = Math.min(cellByHeight, cellByWidth, 40);
+    cellSize = Math.max(cellSize, 22); // Minimum size
+
+    // Set canvas size directly (no offset needed - we draw from 0,0)
+    canvas.width = COLS * cellSize;
+    canvas.height = ROWS * cellSize;
+
+    // Board draws at 0,0 in the canvas
+    boardOffsetX = 0;
+    boardOffsetY = 0;
+
+    if (nextCanvas) {
+        nextCanvas.width = 60;
+        nextCanvas.height = 90;
+    }
 
     render();
 }
@@ -790,37 +804,28 @@ function endGame() {
 // ========================
 
 function render() {
-    // Clear canvas with gradient background
+    if (!ctx) return;
+
+    // Clear canvas with cute gradient background
     const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    gradient.addColorStop(0, '#ffe6f2');
-    gradient.addColorStop(0.3, '#fff0f5');
-    gradient.addColorStop(0.6, '#e6f0ff');
-    gradient.addColorStop(1, '#f0e6ff');
+    gradient.addColorStop(0, '#fff5f8');
+    gradient.addColorStop(1, '#ffe6f0');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Draw board background
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-    ctx.fillRect(boardOffsetX - 5, boardOffsetY - 5, COLS * cellSize + 10, ROWS * cellSize + 10);
-
-    // Draw board border
-    ctx.strokeStyle = '#FFB6C1';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(boardOffsetX - 5, boardOffsetY - 5, COLS * cellSize + 10, ROWS * cellSize + 10);
 
     // Draw grid
     ctx.strokeStyle = 'rgba(255, 182, 193, 0.3)';
     ctx.lineWidth = 1;
     for (let x = 0; x <= COLS; x++) {
         ctx.beginPath();
-        ctx.moveTo(boardOffsetX + x * cellSize, boardOffsetY);
-        ctx.lineTo(boardOffsetX + x * cellSize, boardOffsetY + ROWS * cellSize);
+        ctx.moveTo(x * cellSize, 0);
+        ctx.lineTo(x * cellSize, ROWS * cellSize);
         ctx.stroke();
     }
     for (let y = 0; y <= ROWS; y++) {
         ctx.beginPath();
-        ctx.moveTo(boardOffsetX, boardOffsetY + y * cellSize);
-        ctx.lineTo(boardOffsetX + COLS * cellSize, boardOffsetY + y * cellSize);
+        ctx.moveTo(0, y * cellSize);
+        ctx.lineTo(COLS * cellSize, y * cellSize);
         ctx.stroke();
     }
 
@@ -829,8 +834,8 @@ function render() {
         for (let x = 0; x < COLS; x++) {
             if (board[y][x] !== null) {
                 drawPuyo(
-                    boardOffsetX + x * cellSize + cellSize / 2,
-                    boardOffsetY + (y - HIDDEN_ROWS) * cellSize + cellSize / 2,
+                    x * cellSize + cellSize / 2,
+                    (y - HIDDEN_ROWS) * cellSize + cellSize / 2,
                     board[y][x],
                     cellSize - 4
                 );
@@ -848,38 +853,38 @@ function render() {
         if (ghostY > currentPuyo.y) {
             const ghostSecond = getSecondPuyoPos({ ...currentPuyo, y: ghostY });
             drawPuyo(
-                boardOffsetX + currentPuyo.x * cellSize + cellSize / 2,
-                boardOffsetY + (ghostY - HIDDEN_ROWS) * cellSize + cellSize / 2,
+                currentPuyo.x * cellSize + cellSize / 2,
+                (ghostY - HIDDEN_ROWS) * cellSize + cellSize / 2,
                 currentPuyo.color1,
                 cellSize - 4,
                 true
             );
             drawPuyo(
-                boardOffsetX + ghostSecond.x * cellSize + cellSize / 2,
-                boardOffsetY + (ghostSecond.y - HIDDEN_ROWS) * cellSize + cellSize / 2,
+                ghostSecond.x * cellSize + cellSize / 2,
+                (ghostSecond.y - HIDDEN_ROWS) * cellSize + cellSize / 2,
                 currentPuyo.color2,
                 cellSize - 4,
                 true
             );
         }
 
-        // Draw actual puyo (show even if partially above board)
+        // Draw actual puyo
         const second = getSecondPuyoPos(currentPuyo);
         const displayY1 = currentPuyo.y - HIDDEN_ROWS;
         const displayY2 = second.y - HIDDEN_ROWS;
 
         if (displayY1 >= -1) {
             drawPuyo(
-                boardOffsetX + currentPuyo.x * cellSize + cellSize / 2,
-                boardOffsetY + displayY1 * cellSize + cellSize / 2,
+                currentPuyo.x * cellSize + cellSize / 2,
+                displayY1 * cellSize + cellSize / 2,
                 currentPuyo.color1,
                 cellSize - 4
             );
         }
         if (displayY2 >= -1) {
             drawPuyo(
-                boardOffsetX + second.x * cellSize + cellSize / 2,
-                boardOffsetY + displayY2 * cellSize + cellSize / 2,
+                second.x * cellSize + cellSize / 2,
+                displayY2 * cellSize + cellSize / 2,
                 currentPuyo.color2,
                 cellSize - 4
             );
@@ -967,6 +972,8 @@ function drawPuyo(x, y, colorIndex, size, isGhost = false) {
 }
 
 function renderNext() {
+    if (!nextCtx || !nextCanvas) return;
+
     const gradient = nextCtx.createLinearGradient(0, 0, 0, nextCanvas.height);
     gradient.addColorStop(0, '#FFF0F5');
     gradient.addColorStop(1, '#FFE4EC');
@@ -974,8 +981,10 @@ function renderNext() {
     nextCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
 
     if (nextPuyo) {
-        drawPuyoSmall(nextCtx, 30, 60, nextPuyo.color1, 28);
-        drawPuyoSmall(nextCtx, 30, 30, nextPuyo.color2, 28);
+        const size = 24;
+        const centerX = nextCanvas.width / 2;
+        drawPuyoSmall(nextCtx, centerX, 55, nextPuyo.color1, size);
+        drawPuyoSmall(nextCtx, centerX, 28, nextPuyo.color2, size);
     }
 }
 
@@ -1199,13 +1208,18 @@ function toggleMusic() {
 // INITIALIZE
 // ========================
 
+// Set initial canvas size
+if (nextCanvas) {
+    nextCanvas.width = 60;
+    nextCanvas.height = 90;
+}
+
 resizeCanvas();
 initBoard();
 renderNext();
 updateUI();
 setupTouchControls();
 requestAnimationFrame(gameLoop);
-render();
 
-console.log('PUYO PUYO 2D - Cute Edition');
-console.log('Press START to begin!');
+console.log('💖 ぷよぷよ 2D');
+console.log('STARTボタンをタップしてね!');
