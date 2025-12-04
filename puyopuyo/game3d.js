@@ -68,23 +68,32 @@ const nextCtx = nextCanvas.getContext('2d');
 // ========================
 
 function initThree() {
-    // Scene - cute pastel gradient background
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xFFF0F5); // Lavender blush
-    scene.fog = new THREE.Fog(0xFFE4EC, 20, 40);
+    try {
+        // Scene - cute pastel gradient background
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xFFF0F5); // Lavender blush
+        scene.fog = new THREE.Fog(0xFFE4EC, 20, 40);
 
-    // Camera
-    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
-    updateCameraPosition();
+        // Camera
+        camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+        updateCameraPosition();
 
-    // Renderer
-    renderer = new THREE.WebGLRenderer({
-        canvas: document.getElementById('gameCanvas'),
-        antialias: true
-    });
+        // Renderer with fallback options for mobile
+        const canvas = document.getElementById('gameCanvas');
+        renderer = new THREE.WebGLRenderer({
+            canvas: canvas,
+            antialias: !isMobile, // Disable antialiasing on mobile for performance
+            powerPreference: 'default',
+            failIfMajorPerformanceCaveat: false
+        });
+    } catch (e) {
+        console.error('WebGL initialization failed:', e);
+        alert('3D表示に失敗しました: ' + e.message);
+        return;
+    }
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.shadowMap.enabled = true;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limit pixel ratio for performance
+    renderer.shadowMap.enabled = !isMobile; // Disable shadows on mobile
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     // Soft, warm lighting for cute look
