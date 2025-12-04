@@ -367,6 +367,7 @@
         <button id="soundToggle" onclick="toggleSound()">🔊</button>
         <button id="pauseBtn" onclick="togglePause()">PAUSE</button>
         <div id="ui">
+            <span style="font-size:8px;opacity:0.6">v1.3</span>
             <span>MARIO <span id="score">000000</span></span>
             <span>COINS <span id="coins">00</span></span>
             <span>WORLD <span id="world">1-1</span></span>
@@ -724,31 +725,51 @@
             }
 
             // Process a touch point - add any buttons it's touching
+            // A button: needs release cycle for repeated jumps
+            // B button: hold to dash (stays pressed)
+            // Y button: fire on press
             function processTouchPoint(touch, isNewTouch = false) {
                 const touchId = touch.identifier;
                 const x = touch.clientX;
                 const y = touch.clientY;
 
-                // Get all buttons this touch is over
-                const buttons = getAllButtonsFromPoint(x, y);
+                // Get all buttons this touch is over NOW
+                const buttonsNow = getAllButtonsFromPoint(x, y);
 
                 // Get or create the set of buttons for this touch
                 if (!touchToButtons.has(touchId)) {
                     touchToButtons.set(touchId, new Set());
                 }
-                const currentButtons = touchToButtons.get(touchId);
+                const previousButtons = touchToButtons.get(touchId);
 
-                // Add new buttons (don't remove - once pressed, stay pressed until touch ends)
-                for (const btn of buttons) {
-                    if (!currentButtons.has(btn)) {
-                        // New button activated by this touch
-                        currentButtons.add(btn);
-                        activeTouches[btn].add(touchId);
+                // Handle A button specially - needs to detect press/release cycle
+                const wasOnA = previousButtons.has('a');
+                const isOnA = buttonsNow.includes('a');
 
-                        // Fire fireball on Y press
-                        if (btn === 'y' && typeof mario !== 'undefined' && mario && !mario.isDead) {
-                            mario.shootFireball();
-                        }
+                // If touch moved OFF A button, release it (allow re-press)
+                if (wasOnA && !isOnA) {
+                    previousButtons.delete('a');
+                    activeTouches.a.delete(touchId);
+                }
+                // If touch moved ON A button (new press), activate it
+                if (!wasOnA && isOnA) {
+                    previousButtons.add('a');
+                    activeTouches.a.add(touchId);
+                }
+
+                // B button - stays pressed once touched (for dash)
+                if (!previousButtons.has('b') && buttonsNow.includes('b')) {
+                    previousButtons.add('b');
+                    activeTouches.b.add(touchId);
+                }
+
+                // Y button - fire on first touch only
+                if (!previousButtons.has('y') && buttonsNow.includes('y')) {
+                    previousButtons.add('y');
+                    activeTouches.y.add(touchId);
+                    // Fire fireball on Y press
+                    if (typeof mario !== 'undefined' && mario && !mario.isDead) {
+                        mario.shootFireball();
                     }
                 }
             }
