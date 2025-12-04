@@ -367,7 +367,7 @@
         <button id="soundToggle" onclick="toggleSound()">🔊</button>
         <button id="pauseBtn" onclick="togglePause()">PAUSE</button>
         <div id="ui">
-            <span style="font-size:8px;opacity:0.6">v1.3</span>
+            <span style="font-size:8px;opacity:0.6">v1.4</span>
             <span>MARIO <span id="score">000000</span></span>
             <span>COINS <span id="coins">00</span></span>
             <span>WORLD <span id="world">1-1</span></span>
@@ -419,46 +419,37 @@
     <script src="game.js"></script>
     <script>
         // ===============================
-        // TOUCH CONTROL HANDLING
+        // SCREEN & UI HANDLING
         // ===============================
 
         // Resize canvas to fit screen
         function resizeCanvas() {
             const canvas = document.getElementById('gameCanvas');
-            const container = document.getElementById('gameContainer');
-
             const windowWidth = window.innerWidth;
             const windowHeight = window.innerHeight;
 
-            // Calculate scale to fit screen while maintaining aspect ratio
             const gameAspect = 800 / 480;
             const windowAspect = windowWidth / windowHeight;
 
             let scale;
             if (windowAspect > gameAspect) {
-                // Window is wider than game
                 scale = windowHeight / 480;
             } else {
-                // Window is taller than game
                 scale = windowWidth / 800;
             }
 
-            // Apply scale with some padding for touch controls on mobile
             const isMobile = 'ontouchstart' in window;
             if (isMobile && windowHeight < 500) {
-                scale *= 0.75; // Shrink game to leave room for controls
+                scale *= 0.75;
             }
 
             canvas.style.width = (800 * scale) + 'px';
             canvas.style.height = (480 * scale) + 'px';
         }
 
-        // Initialize resize
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
-        window.addEventListener('orientationchange', () => {
-            setTimeout(resizeCanvas, 100);
-        });
+        window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 100));
 
         // Prevent default touch behaviors
         document.addEventListener('touchmove', (e) => {
@@ -466,381 +457,6 @@
                 e.preventDefault();
             }
         }, { passive: false });
-
-        // Touch control state
-        const touchState = {
-            left: false,
-            right: false,
-            up: false,
-            down: false,
-            jump: false,
-            fire: false,
-            dash: false
-        };
-
-        // Map touch controls to game keys
-        function updateKeysFromTouch() {
-            if (typeof keys !== 'undefined') {
-                keys.left = touchState.left;
-                keys.right = touchState.right;
-                keys.up = touchState.jump || touchState.up;
-                keys.down = touchState.down;
-            }
-        }
-
-        // D-Pad touch handling with slide support
-        // Expose dpad touch ID so action buttons can work independently
-        let activeDpadTouchId = null;
-
-        function setupDPad() {
-            const dpad = document.getElementById('dpad');
-            const dpadButtons = {
-                'dpad-up': 'up',
-                'dpad-down': 'down',
-                'dpad-left': 'left',
-                'dpad-right': 'right'
-            };
-
-            // Get button elements and their bounds
-            const buttons = {};
-            Object.entries(dpadButtons).forEach(([id, direction]) => {
-                buttons[direction] = document.getElementById(id);
-            });
-
-            // Clear all D-pad states
-            function clearDpadState() {
-                touchState.up = false;
-                touchState.down = false;
-                touchState.left = false;
-                touchState.right = false;
-                Object.values(buttons).forEach(btn => {
-                    if (btn) btn.classList.remove('active');
-                });
-            }
-
-            // Update D-pad based on touch position
-            function updateDpadFromTouch(touch) {
-                const dpadRect = dpad.getBoundingClientRect();
-                const x = touch.clientX - dpadRect.left;
-                const y = touch.clientY - dpadRect.top;
-
-                // D-pad is 150x150, each button is 50x50
-                // Center is at 75,75
-                const centerX = 75;
-                const centerY = 75;
-                const dx = x - centerX;
-                const dy = y - centerY;
-
-                // Clear previous state
-                clearDpadState();
-
-                // Determine direction based on position
-                // Use a dead zone in the center (25px radius)
-                const deadZone = 20;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-
-                if (distance < deadZone) {
-                    // In dead zone, no direction
-                    updateKeysFromTouch();
-                    return;
-                }
-
-                // Determine primary direction
-                if (Math.abs(dx) > Math.abs(dy)) {
-                    // Horizontal
-                    if (dx > 0) {
-                        touchState.right = true;
-                        if (buttons.right) buttons.right.classList.add('active');
-                    } else {
-                        touchState.left = true;
-                        if (buttons.left) buttons.left.classList.add('active');
-                    }
-                } else {
-                    // Vertical
-                    if (dy > 0) {
-                        touchState.down = true;
-                        if (buttons.down) buttons.down.classList.add('active');
-                    } else {
-                        touchState.up = true;
-                        if (buttons.up) buttons.up.classList.add('active');
-                    }
-                }
-
-                updateKeysFromTouch();
-            }
-
-            dpad.addEventListener('touchstart', (e) => {
-                // Don't block other touches - only track this one for dpad
-                for (let i = 0; i < e.changedTouches.length; i++) {
-                    const touch = e.changedTouches[i];
-                    if (activeDpadTouchId === null) {
-                        activeDpadTouchId = touch.identifier;
-                        updateDpadFromTouch(touch);
-                        e.preventDefault(); // Only prevent default for dpad touch
-                    }
-                }
-            }, { passive: false });
-
-            dpad.addEventListener('touchmove', (e) => {
-                for (let i = 0; i < e.changedTouches.length; i++) {
-                    if (e.changedTouches[i].identifier === activeDpadTouchId) {
-                        updateDpadFromTouch(e.changedTouches[i]);
-                        e.preventDefault();
-                        break;
-                    }
-                }
-            }, { passive: false });
-
-            dpad.addEventListener('touchend', (e) => {
-                for (let i = 0; i < e.changedTouches.length; i++) {
-                    if (e.changedTouches[i].identifier === activeDpadTouchId) {
-                        activeDpadTouchId = null;
-                        clearDpadState();
-                        updateKeysFromTouch();
-                        break;
-                    }
-                }
-            }, { passive: true });
-
-            dpad.addEventListener('touchcancel', (e) => {
-                for (let i = 0; i < e.changedTouches.length; i++) {
-                    if (e.changedTouches[i].identifier === activeDpadTouchId) {
-                        activeDpadTouchId = null;
-                        clearDpadState();
-                        updateKeysFromTouch();
-                        break;
-                    }
-                }
-            }, { passive: true });
-        }
-
-        // Action buttons touch handling with MULTI-TOUCH support
-        // A = Jump, B = Dash (hold), Y = Fire
-        // 改善: タッチ移動でボタン追加検出、スライド操作対応
-        function setupActionButtons() {
-            const btnA = document.getElementById('btn-a');
-            const btnB = document.getElementById('btn-b');
-            const btnY = document.getElementById('btn-y');
-            const actionButtons = document.getElementById('actionButtons');
-
-            // Track which touch IDs are on which buttons
-            // Now each touch can activate MULTIPLE buttons (for slide gestures)
-            const activeTouches = {
-                a: new Set(),
-                b: new Set(),
-                y: new Set()
-            };
-
-            // Track which buttons each touch has activated (for slide detection)
-            const touchToButtons = new Map(); // touchId -> Set of button names
-
-            // Get button hit with expanded touch area
-            function getButtonFromPoint(x, y) {
-                // First try exact hit
-                const elements = document.elementsFromPoint(x, y);
-                for (const el of elements) {
-                    if (el.id === 'btn-a') return 'a';
-                    if (el.id === 'btn-b') return 'b';
-                    if (el.id === 'btn-y') return 'y';
-                }
-
-                // Expanded hit detection - check if close to any button
-                const buttons = [
-                    { el: btnA, name: 'a' },
-                    { el: btnB, name: 'b' },
-                    { el: btnY, name: 'y' }
-                ];
-
-                const expandedMargin = 15; // Extra touch area around buttons
-
-                for (const btn of buttons) {
-                    if (!btn.el) continue;
-                    const rect = btn.el.getBoundingClientRect();
-                    const expandedRect = {
-                        left: rect.left - expandedMargin,
-                        right: rect.right + expandedMargin,
-                        top: rect.top - expandedMargin,
-                        bottom: rect.bottom + expandedMargin
-                    };
-
-                    if (x >= expandedRect.left && x <= expandedRect.right &&
-                        y >= expandedRect.top && y <= expandedRect.bottom) {
-                        return btn.name;
-                    }
-                }
-
-                return null;
-            }
-
-            // Get ALL buttons that a touch point is over (for multi-button press)
-            function getAllButtonsFromPoint(x, y) {
-                const result = [];
-                const buttons = [
-                    { el: btnA, name: 'a' },
-                    { el: btnB, name: 'b' },
-                    { el: btnY, name: 'y' }
-                ];
-
-                const expandedMargin = 10;
-
-                for (const btn of buttons) {
-                    if (!btn.el) continue;
-                    const rect = btn.el.getBoundingClientRect();
-                    const expandedRect = {
-                        left: rect.left - expandedMargin,
-                        right: rect.right + expandedMargin,
-                        top: rect.top - expandedMargin,
-                        bottom: rect.bottom + expandedMargin
-                    };
-
-                    if (x >= expandedRect.left && x <= expandedRect.right &&
-                        y >= expandedRect.top && y <= expandedRect.bottom) {
-                        result.push(btn.name);
-                    }
-                }
-
-                return result;
-            }
-
-            function updateButtonStates() {
-                // A button - Jump
-                const aPressed = activeTouches.a.size > 0;
-                touchState.jump = aPressed;
-                if (btnA) btnA.classList.toggle('active', aPressed);
-
-                // B button - Dash
-                const bPressed = activeTouches.b.size > 0;
-                touchState.dash = bPressed;
-                if (typeof keys !== 'undefined') {
-                    keys.dash = bPressed;
-                }
-                if (btnB) btnB.classList.toggle('active', bPressed);
-
-                // Y button - Fire
-                const yPressed = activeTouches.y.size > 0;
-                touchState.fire = yPressed;
-                if (btnY) btnY.classList.toggle('active', yPressed);
-
-                updateKeysFromTouch();
-            }
-
-            // Process a touch point - add any buttons it's touching
-            // A button: needs release cycle for repeated jumps
-            // B button: hold to dash (stays pressed)
-            // Y button: fire on press
-            function processTouchPoint(touch, isNewTouch = false) {
-                const touchId = touch.identifier;
-                const x = touch.clientX;
-                const y = touch.clientY;
-
-                // Get all buttons this touch is over NOW
-                const buttonsNow = getAllButtonsFromPoint(x, y);
-
-                // Get or create the set of buttons for this touch
-                if (!touchToButtons.has(touchId)) {
-                    touchToButtons.set(touchId, new Set());
-                }
-                const previousButtons = touchToButtons.get(touchId);
-
-                // Handle A button specially - needs to detect press/release cycle
-                const wasOnA = previousButtons.has('a');
-                const isOnA = buttonsNow.includes('a');
-
-                // If touch moved OFF A button, release it (allow re-press)
-                if (wasOnA && !isOnA) {
-                    previousButtons.delete('a');
-                    activeTouches.a.delete(touchId);
-                }
-                // If touch moved ON A button (new press), activate it
-                if (!wasOnA && isOnA) {
-                    previousButtons.add('a');
-                    activeTouches.a.add(touchId);
-                }
-
-                // B button - stays pressed once touched (for dash)
-                if (!previousButtons.has('b') && buttonsNow.includes('b')) {
-                    previousButtons.add('b');
-                    activeTouches.b.add(touchId);
-                }
-
-                // Y button - fire on first touch only
-                if (!previousButtons.has('y') && buttonsNow.includes('y')) {
-                    previousButtons.add('y');
-                    activeTouches.y.add(touchId);
-                    // Fire fireball on Y press
-                    if (typeof mario !== 'undefined' && mario && !mario.isDead) {
-                        mario.shootFireball();
-                    }
-                }
-            }
-
-            // Remove all button states for a touch
-            function removeTouchState(touchId) {
-                activeTouches.a.delete(touchId);
-                activeTouches.b.delete(touchId);
-                activeTouches.y.delete(touchId);
-                touchToButtons.delete(touchId);
-            }
-
-            // Handle touch start on action buttons area
-            actionButtons.addEventListener('touchstart', (e) => {
-                e.preventDefault(); // Prevent delays
-                for (let i = 0; i < e.changedTouches.length; i++) {
-                    processTouchPoint(e.changedTouches[i], true);
-                }
-                updateButtonStates();
-            }, { passive: false });
-
-            // Handle touch move - KEY: detect sliding onto new buttons
-            actionButtons.addEventListener('touchmove', (e) => {
-                e.preventDefault();
-                for (let i = 0; i < e.changedTouches.length; i++) {
-                    processTouchPoint(e.changedTouches[i], false);
-                }
-                updateButtonStates();
-            }, { passive: false });
-
-            // Handle touch end
-            actionButtons.addEventListener('touchend', (e) => {
-                for (let i = 0; i < e.changedTouches.length; i++) {
-                    removeTouchState(e.changedTouches[i].identifier);
-                }
-                updateButtonStates();
-            }, { passive: true });
-
-            // Handle touch cancel
-            actionButtons.addEventListener('touchcancel', (e) => {
-                for (let i = 0; i < e.changedTouches.length; i++) {
-                    removeTouchState(e.changedTouches[i].identifier);
-                }
-                updateButtonStates();
-            }, { passive: true });
-
-            // Global touch tracking - capture touches that start elsewhere and move to buttons
-            document.addEventListener('touchmove', (e) => {
-                for (let i = 0; i < e.touches.length; i++) {
-                    const touch = e.touches[i];
-                    // Check if this touch is now over action buttons area
-                    const rect = actionButtons.getBoundingClientRect();
-                    if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
-                        touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
-                        processTouchPoint(touch, false);
-                    }
-                }
-                updateButtonStates();
-            }, { passive: true });
-
-            // Also listen on document for touches that end outside buttons
-            document.addEventListener('touchend', (e) => {
-                for (let i = 0; i < e.changedTouches.length; i++) {
-                    const touchId = e.changedTouches[i].identifier;
-                    if (touchToButtons.has(touchId)) {
-                        removeTouchState(touchId);
-                        updateButtonStates();
-                    }
-                }
-            }, { passive: true });
-        }
 
         // Pause functionality
         function togglePause() {
@@ -852,10 +468,6 @@
                 }
             }
         }
-
-        // Initialize touch controls
-        setupDPad();
-        setupActionButtons();
 
         // ===============================
         // iOS SAFARI AUDIO FIX

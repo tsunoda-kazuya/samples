@@ -1008,6 +1008,319 @@ document.addEventListener('keyup', (e) => {
 });
 
 // ===============================
+// TOUCH CONTROLS
+// ===============================
+
+const touchState = {
+    left: false,
+    right: false,
+    up: false,
+    down: false,
+    jump: false,
+    fire: false,
+    dash: false
+};
+
+// Update keys from touch state
+function updateKeysFromTouch() {
+    keys.left = touchState.left;
+    keys.right = touchState.right;
+    keys.up = touchState.jump || touchState.up;
+    keys.down = touchState.down;
+}
+
+// D-Pad touch handling
+let activeDpadTouchId = null;
+
+function setupDPad() {
+    const dpad = document.getElementById('dpad');
+    if (!dpad) return;
+
+    const dpadButtons = {
+        'dpad-up': 'up',
+        'dpad-down': 'down',
+        'dpad-left': 'left',
+        'dpad-right': 'right'
+    };
+
+    const buttons = {};
+    Object.entries(dpadButtons).forEach(([id, direction]) => {
+        buttons[direction] = document.getElementById(id);
+    });
+
+    function clearDpadState() {
+        touchState.up = false;
+        touchState.down = false;
+        touchState.left = false;
+        touchState.right = false;
+        Object.values(buttons).forEach(btn => {
+            if (btn) btn.classList.remove('active');
+        });
+    }
+
+    function updateDpadFromTouch(touch) {
+        const dpadRect = dpad.getBoundingClientRect();
+        const x = touch.clientX - dpadRect.left;
+        const y = touch.clientY - dpadRect.top;
+
+        const centerX = 75;
+        const centerY = 75;
+        const dx = x - centerX;
+        const dy = y - centerY;
+
+        clearDpadState();
+
+        const deadZone = 20;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < deadZone) {
+            updateKeysFromTouch();
+            return;
+        }
+
+        if (Math.abs(dx) > Math.abs(dy)) {
+            if (dx > 0) {
+                touchState.right = true;
+                if (buttons.right) buttons.right.classList.add('active');
+            } else {
+                touchState.left = true;
+                if (buttons.left) buttons.left.classList.add('active');
+            }
+        } else {
+            if (dy > 0) {
+                touchState.down = true;
+                if (buttons.down) buttons.down.classList.add('active');
+            } else {
+                touchState.up = true;
+                if (buttons.up) buttons.up.classList.add('active');
+            }
+        }
+
+        updateKeysFromTouch();
+    }
+
+    dpad.addEventListener('touchstart', (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            if (activeDpadTouchId === null) {
+                activeDpadTouchId = touch.identifier;
+                updateDpadFromTouch(touch);
+                e.preventDefault();
+            }
+        }
+    }, { passive: false });
+
+    dpad.addEventListener('touchmove', (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            if (e.changedTouches[i].identifier === activeDpadTouchId) {
+                updateDpadFromTouch(e.changedTouches[i]);
+                e.preventDefault();
+                break;
+            }
+        }
+    }, { passive: false });
+
+    dpad.addEventListener('touchend', (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            if (e.changedTouches[i].identifier === activeDpadTouchId) {
+                activeDpadTouchId = null;
+                clearDpadState();
+                updateKeysFromTouch();
+                break;
+            }
+        }
+    }, { passive: true });
+
+    dpad.addEventListener('touchcancel', (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            if (e.changedTouches[i].identifier === activeDpadTouchId) {
+                activeDpadTouchId = null;
+                clearDpadState();
+                updateKeysFromTouch();
+                break;
+            }
+        }
+    }, { passive: true });
+}
+
+// Action buttons (A, B, Y) touch handling
+function setupActionButtons() {
+    const btnA = document.getElementById('btn-a');
+    const btnB = document.getElementById('btn-b');
+    const btnY = document.getElementById('btn-y');
+    const actionButtons = document.getElementById('actionButtons');
+    if (!actionButtons) return;
+
+    const activeTouches = {
+        a: new Set(),
+        b: new Set(),
+        y: new Set()
+    };
+
+    const touchToButtons = new Map();
+
+    function getAllButtonsFromPoint(x, y) {
+        const result = [];
+        const buttonList = [
+            { el: btnA, name: 'a' },
+            { el: btnB, name: 'b' },
+            { el: btnY, name: 'y' }
+        ];
+
+        const expandedMargin = 10;
+
+        for (const btn of buttonList) {
+            if (!btn.el) continue;
+            const rect = btn.el.getBoundingClientRect();
+            const expandedRect = {
+                left: rect.left - expandedMargin,
+                right: rect.right + expandedMargin,
+                top: rect.top - expandedMargin,
+                bottom: rect.bottom + expandedMargin
+            };
+
+            if (x >= expandedRect.left && x <= expandedRect.right &&
+                y >= expandedRect.top && y <= expandedRect.bottom) {
+                result.push(btn.name);
+            }
+        }
+
+        return result;
+    }
+
+    function updateButtonStates() {
+        const aPressed = activeTouches.a.size > 0;
+        touchState.jump = aPressed;
+        if (btnA) btnA.classList.toggle('active', aPressed);
+
+        const bPressed = activeTouches.b.size > 0;
+        touchState.dash = bPressed;
+        keys.dash = bPressed;
+        if (btnB) btnB.classList.toggle('active', bPressed);
+
+        const yPressed = activeTouches.y.size > 0;
+        touchState.fire = yPressed;
+        if (btnY) btnY.classList.toggle('active', yPressed);
+
+        updateKeysFromTouch();
+    }
+
+    function processTouchPoint(touch) {
+        const touchId = touch.identifier;
+        const x = touch.clientX;
+        const y = touch.clientY;
+
+        const buttonsNow = getAllButtonsFromPoint(x, y);
+
+        if (!touchToButtons.has(touchId)) {
+            touchToButtons.set(touchId, new Set());
+        }
+        const previousButtons = touchToButtons.get(touchId);
+
+        // A button: release when moved off, press when moved on
+        const wasOnA = previousButtons.has('a');
+        const isOnA = buttonsNow.includes('a');
+
+        if (wasOnA && !isOnA) {
+            previousButtons.delete('a');
+            activeTouches.a.delete(touchId);
+        }
+        if (!wasOnA && isOnA) {
+            previousButtons.add('a');
+            activeTouches.a.add(touchId);
+        }
+
+        // B button: stays pressed once touched
+        if (!previousButtons.has('b') && buttonsNow.includes('b')) {
+            previousButtons.add('b');
+            activeTouches.b.add(touchId);
+        }
+
+        // Y button: fire on first touch
+        if (!previousButtons.has('y') && buttonsNow.includes('y')) {
+            previousButtons.add('y');
+            activeTouches.y.add(touchId);
+            if (mario && !mario.isDead) {
+                mario.shootFireball();
+            }
+        }
+    }
+
+    function removeTouchState(touchId) {
+        activeTouches.a.delete(touchId);
+        activeTouches.b.delete(touchId);
+        activeTouches.y.delete(touchId);
+        touchToButtons.delete(touchId);
+    }
+
+    actionButtons.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            processTouchPoint(e.changedTouches[i]);
+        }
+        updateButtonStates();
+    }, { passive: false });
+
+    actionButtons.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            processTouchPoint(e.changedTouches[i]);
+        }
+        updateButtonStates();
+    }, { passive: false });
+
+    actionButtons.addEventListener('touchend', (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            removeTouchState(e.changedTouches[i].identifier);
+        }
+        updateButtonStates();
+    }, { passive: true });
+
+    actionButtons.addEventListener('touchcancel', (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            removeTouchState(e.changedTouches[i].identifier);
+        }
+        updateButtonStates();
+    }, { passive: true });
+
+    // Global touch tracking
+    document.addEventListener('touchmove', (e) => {
+        for (let i = 0; i < e.touches.length; i++) {
+            const touch = e.touches[i];
+            const rect = actionButtons.getBoundingClientRect();
+            if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
+                touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+                processTouchPoint(touch);
+            }
+        }
+        updateButtonStates();
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touchId = e.changedTouches[i].identifier;
+            if (touchToButtons.has(touchId)) {
+                removeTouchState(touchId);
+                updateButtonStates();
+            }
+        }
+    }, { passive: true });
+}
+
+// Initialize touch controls
+function initTouchControls() {
+    setupDPad();
+    setupActionButtons();
+}
+
+// Call on DOM ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTouchControls);
+} else {
+    initTouchControls();
+}
+
+// ===============================
 // SNES-STYLE DRAWING HELPERS
 // ===============================
 
