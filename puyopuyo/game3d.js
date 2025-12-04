@@ -41,10 +41,10 @@ let musicEnabled = true;
 let cameraMode = 0;
 // Adjusted camera distance for mobile - further back to fit more on screen
 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
-// Mobile: move camera up and back to show board higher on screen
+// Mobile: move camera down to show board higher on screen (lower cameraY = board appears higher)
 const cameraZ = isMobile ? 16 : 15;
-const cameraY = isMobile ? 7 : 6;
-const lookAtY = isMobile ? 7 : 6;
+const cameraY = isMobile ? 4 : 6;  // Lower camera position
+const lookAtY = isMobile ? 5 : 6;  // Look slightly up
 const cameraModes = [
     { pos: { x: 3, y: cameraY, z: cameraZ }, lookAt: { x: 3, y: lookAtY, z: 0 } },
     { pos: { x: 12, y: 6, z: 12 }, lookAt: { x: 3, y: 6, z: 0 } },
