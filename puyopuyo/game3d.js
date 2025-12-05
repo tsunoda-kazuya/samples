@@ -492,8 +492,8 @@ function createPuyoMesh(colorIndex, isGhost = false) {
 }
 
 function updateBoardMeshes() {
-    // Remove old meshes
-    puyoMeshes.forEach(mesh => scene.remove(mesh));
+    // Remove old meshes and dispose resources
+    puyoMeshes.forEach(mesh => disposeMesh(mesh));
     puyoMeshes = [];
 
     // Create new meshes for board
@@ -515,11 +515,28 @@ function updateBoardMeshes() {
     }
 }
 
+// Dispose mesh and all its children to free GPU memory
+function disposeMesh(mesh) {
+    if (!mesh) return;
+    scene.remove(mesh);
+
+    mesh.traverse((child) => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+            if (Array.isArray(child.material)) {
+                child.material.forEach(m => m.dispose());
+            } else {
+                child.material.dispose();
+            }
+        }
+    });
+}
+
 function updateCurrentPuyoMeshes() {
-    // Remove old current puyo meshes
-    currentPuyoMeshes.forEach(mesh => scene.remove(mesh));
+    // Remove old current puyo meshes and dispose
+    currentPuyoMeshes.forEach(mesh => disposeMesh(mesh));
     currentPuyoMeshes = [];
-    ghostMeshes.forEach(mesh => scene.remove(mesh));
+    ghostMeshes.forEach(mesh => disposeMesh(mesh));
     ghostMeshes = [];
 
     if (!currentPuyo || animating) return;
@@ -567,11 +584,12 @@ function updateCurrentPuyoMeshes() {
 // CUTE PARTICLE EFFECTS - Hearts and Stars!
 // ========================
 
-const MAX_HEART_PARTICLES = 50; // Limit for mobile performance
+const MAX_HEART_PARTICLES = 30; // Limit for mobile performance
 
 function createExplosionParticles(x, y, colorIndex) {
     // Reduce particle count if too many exist
-    const particleCount = heartParticles.length > MAX_HEART_PARTICLES ? 5 : 15;
+    if (heartParticles.length >= MAX_HEART_PARTICLES) return; // Skip if at limit
+    const particleCount = Math.min(8, MAX_HEART_PARTICLES - heartParticles.length);
     const color = COLORS[colorIndex];
 
     // Create cute heart and star shaped particles
@@ -657,6 +675,9 @@ function updateHeartParticles() {
 
         if (p.userData.life <= 0) {
             scene.remove(p);
+            // Dispose geometry and material to free memory
+            if (p.geometry) p.geometry.dispose();
+            if (p.material) p.material.dispose();
             heartParticles.splice(i, 1);
         }
     }
@@ -727,6 +748,9 @@ function updateParticles() {
 
         if (particles.userData.life <= 0) {
             scene.remove(particles);
+            // Dispose geometry and material to free memory
+            if (particles.geometry) particles.geometry.dispose();
+            if (particles.material) particles.material.dispose();
             particleSystems.splice(i, 1);
         }
     }
@@ -1943,15 +1967,25 @@ function startGame() {
     initAudio();
     initBoard();
 
-    // Clear all meshes
-    puyoMeshes.forEach(mesh => scene.remove(mesh));
+    // Clear all meshes and dispose GPU resources
+    puyoMeshes.forEach(mesh => disposeMesh(mesh));
     puyoMeshes = [];
-    currentPuyoMeshes.forEach(mesh => scene.remove(mesh));
+    currentPuyoMeshes.forEach(mesh => disposeMesh(mesh));
     currentPuyoMeshes = [];
-    ghostMeshes.forEach(mesh => scene.remove(mesh));
+    ghostMeshes.forEach(mesh => disposeMesh(mesh));
     ghostMeshes = [];
-    particleSystems.forEach(p => scene.remove(p));
+    particleSystems.forEach(p => {
+        scene.remove(p);
+        if (p.geometry) p.geometry.dispose();
+        if (p.material) p.material.dispose();
+    });
     particleSystems = [];
+    heartParticles.forEach(p => {
+        scene.remove(p);
+        if (p.geometry) p.geometry.dispose();
+        if (p.material) p.material.dispose();
+    });
+    heartParticles = [];
 
     score = 0;
     chains = 0;
