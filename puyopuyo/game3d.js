@@ -783,10 +783,10 @@ class PerfumeMusicPlayer {
         this.masterGain = masterGain;
         this.isPlaying = false;
         this.nodes = [];
-        this.timeouts = [];
         this.currentBeat = 0;
         this.bpm = 128; // Classic electropop tempo
         this.beatLength = 60 / this.bpm;
+        this.nextBeatTime = 0;
 
         // Create effects chain
         this.setupEffects();
@@ -1174,6 +1174,9 @@ class PerfumeMusicPlayer {
     scheduleNextBeat() {
         if (!this.isPlaying) return;
 
+        // Clean up old nodes to prevent memory leak
+        this.cleanupNodes();
+
         const beat = this.currentBeat;
 
         // Play all elements
@@ -1189,13 +1192,57 @@ class PerfumeMusicPlayer {
 
         this.currentBeat++;
 
-        // Schedule next beat (16th notes for tighter rhythm)
-        const timeout = setTimeout(() => this.scheduleNextBeat(), (this.beatLength / 4) * 1000);
-        this.timeouts.push(timeout);
+        // Use requestAnimationFrame with audio context time for more reliable timing
+        const beatDuration = (this.beatLength / 4) * 1000;
+        this.nextBeatTime = performance.now() + beatDuration;
+
+        const scheduleNext = () => {
+            if (!this.isPlaying) return;
+
+            const now = performance.now();
+            if (now >= this.nextBeatTime) {
+                this.scheduleNextBeat();
+            } else {
+                // Check audio context state and resume if needed
+                if (this.audioCtx.state === 'suspended') {
+                    this.audioCtx.resume();
+                }
+                requestAnimationFrame(scheduleNext);
+            }
+        };
+
+        requestAnimationFrame(scheduleNext);
+    }
+
+    cleanupNodes() {
+        // Remove finished oscillators
+        const now = this.audioCtx.currentTime;
+        this.nodes = this.nodes.filter(node => {
+            try {
+                // Keep nodes that might still be playing
+                return node.osc && node.osc.context && node.osc.context.state === 'running';
+            } catch (e) {
+                return false;
+            }
+        });
+
+        // Limit max nodes to prevent memory issues
+        if (this.nodes.length > 100) {
+            const oldNodes = this.nodes.splice(0, this.nodes.length - 50);
+            oldNodes.forEach(({ osc }) => {
+                try { osc.stop(); } catch (e) {}
+            });
+        }
     }
 
     start() {
         if (this.isPlaying) return;
+
+        // Resume audio context if suspended (important for mobile)
+        if (this.audioCtx.state === 'suspended') {
+            this.audioCtx.resume();
+        }
+
         this.isPlaying = true;
         this.currentBeat = 0;
         this.scheduleNextBeat();
@@ -1203,8 +1250,6 @@ class PerfumeMusicPlayer {
 
     stop() {
         this.isPlaying = false;
-        this.timeouts.forEach(t => clearTimeout(t));
-        this.timeouts = [];
         this.nodes.forEach(({ osc }) => { try { osc.stop(); } catch (e) {} });
         this.nodes = [];
     }
