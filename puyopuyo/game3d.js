@@ -14,13 +14,16 @@ const COLS = 6;
 const ROWS = 12;
 const HIDDEN_ROWS = 1;
 const CELL_SIZE = 1;
-// Cute pastel colors for girls!
-const COLORS = [0xFFB7C5, 0xB5EAD7, 0xA7C7E7, 0xFFF0B3, 0xE8D5E8];
-const COLOR_NAMES = ['pink', 'mint', 'skyblue', 'lemon', 'lavender'];
+// Vivid cute colors - easier to distinguish!
+const COLORS = [0xFF6B8A, 0x50C878, 0x4DA6FF, 0xFFD700, 0xDA70D6];
+const COLOR_NAMES = ['pink', 'green', 'blue', 'yellow', 'purple'];
 
 // Sparkle particles
 let sparkleParticles = [];
 let heartParticles = [];
+
+// Eye blink animation
+let blinkTime = 0;
 
 // Game state
 let board = [];
@@ -424,6 +427,17 @@ function createPuyoMesh(colorIndex, isGhost = false) {
         rightSparkle.position.set(0.17, 0.13, 0.48);
         puyo.add(rightSparkle);
 
+        // Store eye parts for animation (blink by scaling eye whites)
+        puyo.userData.eyes = {
+            leftEyeWhite: leftEyeWhite,
+            rightEyeWhite: rightEyeWhite,
+            leftPupil: leftPupil,
+            rightPupil: rightPupil,
+            leftSparkle: leftSparkle,
+            rightSparkle: rightSparkle,
+            blinkOffset: Math.random() * Math.PI * 2
+        };
+
         // Cute rosy cheeks (blush)
         const cheekMaterial = new THREE.MeshBasicMaterial({
             color: 0xFFB6C1,
@@ -474,7 +488,8 @@ function createPuyoMesh(colorIndex, isGhost = false) {
         puyo.add(smile);
     }
 
-    puyo.userData = { colorIndex, isGhost };
+    puyo.userData.colorIndex = colorIndex;
+    puyo.userData.isGhost = isGhost;
     return puyo;
 }
 
@@ -1593,6 +1608,68 @@ function updateUI() {
 }
 
 // ========================
+// EYE ANIMATION
+// ========================
+
+function animateEyes(mesh) {
+    if (!mesh || !mesh.userData || !mesh.userData.eyes) return;
+
+    const eyes = mesh.userData.eyes;
+    const blinkCycle = blinkTime + (eyes.blinkOffset || 0);
+
+    // Blink every ~2.5 seconds with quick close/open
+    const blinkInterval = (blinkCycle % 4); // 4 units = ~2.5 seconds
+
+    // Eye scale for blinking (1.1 = open, 0.1 = closed)
+    let eyeScaleY = 1.1;
+    let pupilScaleY = 1;
+    let sparkleVisible = true;
+
+    // Blink when interval is between 0 and 0.3 (quick blink)
+    if (blinkInterval < 0.3) {
+        const blinkProgress = Math.sin(blinkInterval * Math.PI / 0.3);
+        eyeScaleY = 1.1 - blinkProgress * 1.0; // 1.1 -> 0.1 -> 1.1
+        pupilScaleY = 1 - blinkProgress * 0.9; // 1 -> 0.1 -> 1
+        sparkleVisible = blinkProgress < 0.5;
+    }
+
+    // Apply eye white scale (squash for blink)
+    if (eyes.leftEyeWhite) eyes.leftEyeWhite.scale.y = eyeScaleY;
+    if (eyes.rightEyeWhite) eyes.rightEyeWhite.scale.y = eyeScaleY;
+
+    // Apply pupil scale
+    if (eyes.leftPupil) eyes.leftPupil.scale.y = pupilScaleY;
+    if (eyes.rightPupil) eyes.rightPupil.scale.y = pupilScaleY;
+
+    // Hide sparkles during blink
+    if (eyes.leftSparkle) eyes.leftSparkle.visible = sparkleVisible;
+    if (eyes.rightSparkle) eyes.rightSparkle.visible = sparkleVisible;
+
+    // More noticeable pupil movement (looking around cutely)
+    const lookX = Math.sin(blinkCycle * 0.5) * 0.03;
+    const lookY = Math.cos(blinkCycle * 0.4) * 0.02;
+
+    if (eyes.leftPupil) {
+        eyes.leftPupil.position.x = -0.14 + lookX;
+        eyes.leftPupil.position.y = 0.1 + lookY;
+    }
+    if (eyes.rightPupil) {
+        eyes.rightPupil.position.x = 0.14 + lookX;
+        eyes.rightPupil.position.y = 0.1 + lookY;
+    }
+
+    // Move sparkles with pupils
+    if (eyes.leftSparkle) {
+        eyes.leftSparkle.position.x = -0.11 + lookX;
+        eyes.leftSparkle.position.y = 0.13 + lookY;
+    }
+    if (eyes.rightSparkle) {
+        eyes.rightSparkle.position.x = 0.17 + lookX;
+        eyes.rightSparkle.position.y = 0.13 + lookY;
+    }
+}
+
+// ========================
 // GAME LOOP
 // ========================
 
@@ -1601,6 +1678,8 @@ function animate(timestamp) {
 
     // Update puyo bouncing animation - more bouncy and cute!
     bounceTime += 0.06;
+    blinkTime += 0.05;
+
     puyoMeshes.forEach(mesh => {
         if (mesh.userData.baseY !== undefined) {
             const bounce = Math.sin(bounceTime + mesh.userData.bounceOffset) * 0.05;
@@ -1609,6 +1688,14 @@ function animate(timestamp) {
             const squish = 1 + Math.sin(bounceTime * 2 + mesh.userData.bounceOffset) * 0.02;
             mesh.scale.set(squish, 1/squish, squish);
         }
+
+        // Eye blink animation
+        animateEyes(mesh);
+    });
+
+    // Also animate current falling puyo eyes
+    currentPuyoMeshes.forEach(mesh => {
+        animateEyes(mesh);
     });
 
     // Update sparkle particles - rotation only, no position changes for stability
