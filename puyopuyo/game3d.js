@@ -1603,6 +1603,44 @@ function updateUI() {
     document.getElementById('chains').textContent = chains;
     const levelEl = document.getElementById('level');
     if (levelEl) levelEl.textContent = level;
+
+    // Update speed based on score
+    updateSpeed();
+}
+
+function updateSpeed() {
+    // Speed progression over ~10 minutes of play
+    // Assuming average score gain: ~500-1000 points per minute
+    // Target: reach max speed around 5000-10000 points
+
+    // Starting speed: 1000ms, Max speed: 200ms
+    // Gradual curve based on score thresholds
+    const speedLevels = [
+        { score: 0, interval: 1000 },      // Level 1: Start
+        { score: 500, interval: 900 },     // Level 2: ~1 min
+        { score: 1500, interval: 800 },    // Level 3: ~2 min
+        { score: 3000, interval: 700 },    // Level 4: ~3-4 min
+        { score: 5000, interval: 600 },    // Level 5: ~5 min
+        { score: 7500, interval: 500 },    // Level 6: ~6-7 min
+        { score: 10000, interval: 400 },   // Level 7: ~8 min
+        { score: 15000, interval: 300 },   // Level 8: ~10 min
+        { score: 25000, interval: 250 },   // Level 9: Expert
+        { score: 50000, interval: 200 }    // Level 10: Max speed
+    ];
+
+    let newLevel = 1;
+    let newInterval = 1000;
+
+    for (let i = speedLevels.length - 1; i >= 0; i--) {
+        if (score >= speedLevels[i].score) {
+            newInterval = speedLevels[i].interval;
+            newLevel = i + 1;
+            break;
+        }
+    }
+
+    dropInterval = newInterval;
+    level = newLevel;
 }
 
 // ========================
