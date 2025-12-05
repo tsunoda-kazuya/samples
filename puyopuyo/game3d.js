@@ -395,10 +395,12 @@ function createPuyoMesh(colorIndex, isGhost = false) {
         const leftEyeWhite = new THREE.Mesh(eyeGeometry, eyeWhiteMaterial);
         leftEyeWhite.position.set(-0.14, 0.08, 0.36);
         leftEyeWhite.scale.set(1, 1.1, 0.6);
+        leftEyeWhite.name = 'leftEyeWhite';
         puyo.add(leftEyeWhite);
 
         const leftPupil = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 16), eyePupilMaterial);
         leftPupil.position.set(-0.14, 0.1, 0.44);
+        leftPupil.name = 'leftPupil';
         puyo.add(leftPupil);
 
         // Left eye sparkle (kawaii!)
@@ -407,16 +409,19 @@ function createPuyoMesh(colorIndex, isGhost = false) {
             new THREE.MeshBasicMaterial({ color: 0xffffff })
         );
         leftSparkle.position.set(-0.11, 0.13, 0.48);
+        leftSparkle.name = 'leftSparkle';
         puyo.add(leftSparkle);
 
         // Right eye
         const rightEyeWhite = new THREE.Mesh(eyeGeometry, eyeWhiteMaterial);
         rightEyeWhite.position.set(0.14, 0.08, 0.36);
         rightEyeWhite.scale.set(1, 1.1, 0.6);
+        rightEyeWhite.name = 'rightEyeWhite';
         puyo.add(rightEyeWhite);
 
         const rightPupil = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 16), eyePupilMaterial);
         rightPupil.position.set(0.14, 0.1, 0.44);
+        rightPupil.name = 'rightPupil';
         puyo.add(rightPupil);
 
         // Right eye sparkle
@@ -425,18 +430,11 @@ function createPuyoMesh(colorIndex, isGhost = false) {
             new THREE.MeshBasicMaterial({ color: 0xffffff })
         );
         rightSparkle.position.set(0.17, 0.13, 0.48);
+        rightSparkle.name = 'rightSparkle';
         puyo.add(rightSparkle);
 
-        // Store eye parts for animation (blink by scaling eye whites)
-        puyo.userData.eyes = {
-            leftEyeWhite: leftEyeWhite,
-            rightEyeWhite: rightEyeWhite,
-            leftPupil: leftPupil,
-            rightPupil: rightPupil,
-            leftSparkle: leftSparkle,
-            rightSparkle: rightSparkle,
-            blinkOffset: Math.random() * Math.PI * 2
-        };
+        // Store blink offset for animation timing
+        puyo.userData.blinkOffset = Math.random() * Math.PI * 2;
 
         // Cute rosy cheeks (blush)
         const cheekMaterial = new THREE.MeshBasicMaterial({
@@ -1612,10 +1610,19 @@ function updateUI() {
 // ========================
 
 function animateEyes(mesh) {
-    if (!mesh || !mesh.userData || !mesh.userData.eyes) return;
+    if (!mesh || !mesh.userData) return;
 
-    const eyes = mesh.userData.eyes;
-    const blinkCycle = blinkTime + (eyes.blinkOffset || 0);
+    // Get eye parts by name (more reliable on mobile Safari)
+    const leftEyeWhite = mesh.getObjectByName('leftEyeWhite');
+    const rightEyeWhite = mesh.getObjectByName('rightEyeWhite');
+    const leftPupil = mesh.getObjectByName('leftPupil');
+    const rightPupil = mesh.getObjectByName('rightPupil');
+    const leftSparkle = mesh.getObjectByName('leftSparkle');
+    const rightSparkle = mesh.getObjectByName('rightSparkle');
+
+    if (!leftEyeWhite) return; // No eyes on this mesh
+
+    const blinkCycle = blinkTime + (mesh.userData.blinkOffset || 0);
 
     // Blink every ~2.5 seconds with quick close/open
     const blinkInterval = (blinkCycle % 4); // 4 units = ~2.5 seconds
@@ -1634,38 +1641,38 @@ function animateEyes(mesh) {
     }
 
     // Apply eye white scale (squash for blink)
-    if (eyes.leftEyeWhite) eyes.leftEyeWhite.scale.y = eyeScaleY;
-    if (eyes.rightEyeWhite) eyes.rightEyeWhite.scale.y = eyeScaleY;
+    leftEyeWhite.scale.y = eyeScaleY;
+    if (rightEyeWhite) rightEyeWhite.scale.y = eyeScaleY;
 
     // Apply pupil scale
-    if (eyes.leftPupil) eyes.leftPupil.scale.y = pupilScaleY;
-    if (eyes.rightPupil) eyes.rightPupil.scale.y = pupilScaleY;
+    if (leftPupil) leftPupil.scale.y = pupilScaleY;
+    if (rightPupil) rightPupil.scale.y = pupilScaleY;
 
     // Hide sparkles during blink
-    if (eyes.leftSparkle) eyes.leftSparkle.visible = sparkleVisible;
-    if (eyes.rightSparkle) eyes.rightSparkle.visible = sparkleVisible;
+    if (leftSparkle) leftSparkle.visible = sparkleVisible;
+    if (rightSparkle) rightSparkle.visible = sparkleVisible;
 
     // More noticeable pupil movement (looking around cutely)
     const lookX = Math.sin(blinkCycle * 0.5) * 0.03;
     const lookY = Math.cos(blinkCycle * 0.4) * 0.02;
 
-    if (eyes.leftPupil) {
-        eyes.leftPupil.position.x = -0.14 + lookX;
-        eyes.leftPupil.position.y = 0.1 + lookY;
+    if (leftPupil) {
+        leftPupil.position.x = -0.14 + lookX;
+        leftPupil.position.y = 0.1 + lookY;
     }
-    if (eyes.rightPupil) {
-        eyes.rightPupil.position.x = 0.14 + lookX;
-        eyes.rightPupil.position.y = 0.1 + lookY;
+    if (rightPupil) {
+        rightPupil.position.x = 0.14 + lookX;
+        rightPupil.position.y = 0.1 + lookY;
     }
 
     // Move sparkles with pupils
-    if (eyes.leftSparkle) {
-        eyes.leftSparkle.position.x = -0.11 + lookX;
-        eyes.leftSparkle.position.y = 0.13 + lookY;
+    if (leftSparkle) {
+        leftSparkle.position.x = -0.11 + lookX;
+        leftSparkle.position.y = 0.13 + lookY;
     }
-    if (eyes.rightSparkle) {
-        eyes.rightSparkle.position.x = 0.17 + lookX;
-        eyes.rightSparkle.position.y = 0.13 + lookY;
+    if (rightSparkle) {
+        rightSparkle.position.x = 0.17 + lookX;
+        rightSparkle.position.y = 0.13 + lookY;
     }
 }
 
