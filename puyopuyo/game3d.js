@@ -1610,17 +1610,25 @@ function updateUI() {
 // ========================
 
 function animateEyes(mesh) {
-    if (!mesh || !mesh.userData) return;
+    if (!mesh || !mesh.userData || !mesh.children || mesh.children.length < 7) return;
 
-    // Get eye parts by name (more reliable on mobile Safari)
-    const leftEyeWhite = mesh.getObjectByName('leftEyeWhite');
-    const rightEyeWhite = mesh.getObjectByName('rightEyeWhite');
-    const leftPupil = mesh.getObjectByName('leftPupil');
-    const rightPupil = mesh.getObjectByName('rightPupil');
-    const leftSparkle = mesh.getObjectByName('leftSparkle');
-    const rightSparkle = mesh.getObjectByName('rightSparkle');
+    // Cache eye references on first call (Safari-friendly)
+    if (!mesh.userData.eyesCached) {
+        mesh.userData.eyesCached = true;
+        // Children order: body(0), leftEyeWhite(1), leftPupil(2), leftSparkle(3),
+        //                 rightEyeWhite(4), rightPupil(5), rightSparkle(6), ...
+        mesh.userData.cachedEyes = {
+            leftEyeWhite: mesh.children[1],
+            leftPupil: mesh.children[2],
+            leftSparkle: mesh.children[3],
+            rightEyeWhite: mesh.children[4],
+            rightPupil: mesh.children[5],
+            rightSparkle: mesh.children[6]
+        };
+    }
 
-    if (!leftEyeWhite) return; // No eyes on this mesh
+    const eyes = mesh.userData.cachedEyes;
+    if (!eyes || !eyes.leftEyeWhite) return;
 
     const blinkCycle = blinkTime + (mesh.userData.blinkOffset || 0);
 
@@ -1641,39 +1649,31 @@ function animateEyes(mesh) {
     }
 
     // Apply eye white scale (squash for blink)
-    leftEyeWhite.scale.y = eyeScaleY;
-    if (rightEyeWhite) rightEyeWhite.scale.y = eyeScaleY;
+    eyes.leftEyeWhite.scale.y = eyeScaleY;
+    eyes.rightEyeWhite.scale.y = eyeScaleY;
 
     // Apply pupil scale
-    if (leftPupil) leftPupil.scale.y = pupilScaleY;
-    if (rightPupil) rightPupil.scale.y = pupilScaleY;
+    eyes.leftPupil.scale.y = pupilScaleY;
+    eyes.rightPupil.scale.y = pupilScaleY;
 
     // Hide sparkles during blink
-    if (leftSparkle) leftSparkle.visible = sparkleVisible;
-    if (rightSparkle) rightSparkle.visible = sparkleVisible;
+    eyes.leftSparkle.visible = sparkleVisible;
+    eyes.rightSparkle.visible = sparkleVisible;
 
     // More noticeable pupil movement (looking around cutely)
     const lookX = Math.sin(blinkCycle * 0.5) * 0.03;
     const lookY = Math.cos(blinkCycle * 0.4) * 0.02;
 
-    if (leftPupil) {
-        leftPupil.position.x = -0.14 + lookX;
-        leftPupil.position.y = 0.1 + lookY;
-    }
-    if (rightPupil) {
-        rightPupil.position.x = 0.14 + lookX;
-        rightPupil.position.y = 0.1 + lookY;
-    }
+    eyes.leftPupil.position.x = -0.14 + lookX;
+    eyes.leftPupil.position.y = 0.1 + lookY;
+    eyes.rightPupil.position.x = 0.14 + lookX;
+    eyes.rightPupil.position.y = 0.1 + lookY;
 
     // Move sparkles with pupils
-    if (leftSparkle) {
-        leftSparkle.position.x = -0.11 + lookX;
-        leftSparkle.position.y = 0.13 + lookY;
-    }
-    if (rightSparkle) {
-        rightSparkle.position.x = 0.17 + lookX;
-        rightSparkle.position.y = 0.13 + lookY;
-    }
+    eyes.leftSparkle.position.x = -0.11 + lookX;
+    eyes.leftSparkle.position.y = 0.13 + lookY;
+    eyes.rightSparkle.position.x = 0.17 + lookX;
+    eyes.rightSparkle.position.y = 0.13 + lookY;
 }
 
 // ========================
