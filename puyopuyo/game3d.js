@@ -310,7 +310,7 @@ function createBackground() {
 
 // Create floating sparkle effects
 function createSparkles() {
-    const sparkleCount = 30;
+    const sparkleCount = 15; // Reduced for mobile performance
 
     for (let i = 0; i < sparkleCount; i++) {
         const sparkleGeo = new THREE.OctahedronGeometry(0.08, 0);
@@ -567,8 +567,11 @@ function updateCurrentPuyoMeshes() {
 // CUTE PARTICLE EFFECTS - Hearts and Stars!
 // ========================
 
+const MAX_HEART_PARTICLES = 50; // Limit for mobile performance
+
 function createExplosionParticles(x, y, colorIndex) {
-    const particleCount = 25;
+    // Reduce particle count if too many exist
+    const particleCount = heartParticles.length > MAX_HEART_PARTICLES ? 5 : 15;
     const color = COLORS[colorIndex];
 
     // Create cute heart and star shaped particles
@@ -660,8 +663,13 @@ function updateHeartParticles() {
 }
 
 // Legacy particle function for compatibility
+const MAX_PARTICLE_SYSTEMS = 10;
+
 function createExplosionParticlesLegacy(x, y, colorIndex) {
-    const particleCount = 20;
+    // Skip if too many particle systems
+    if (particleSystems.length >= MAX_PARTICLE_SYSTEMS) return;
+
+    const particleCount = 10; // Reduced for mobile
     const color = COLORS[colorIndex];
 
     const geometry = new THREE.BufferGeometry();
@@ -734,7 +742,45 @@ function initAudio() {
         musicGain = audioCtx.createGain();
         musicGain.gain.value = 0.3;
         musicGain.connect(audioCtx.destination);
+
+        // iOS Safari fix: resume on any user interaction
+        const resumeAudio = () => {
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        };
+
+        // Listen for all user interactions
+        ['touchstart', 'touchend', 'mousedown', 'keydown'].forEach(event => {
+            document.addEventListener(event, resumeAudio, { passive: true });
+        });
+
+        // Keep audio context alive with silent buffer (iOS Safari fix)
+        startKeepAlive();
     }
+}
+
+// Play silent audio periodically to keep iOS Safari audio context alive
+let keepAliveInterval = null;
+let silentBuffer = null;
+
+function startKeepAlive() {
+    if (keepAliveInterval) return;
+
+    keepAliveInterval = setInterval(() => {
+        if (audioCtx && audioCtx.state === 'running' && musicEnabled) {
+            // Reuse silent buffer to prevent memory leak
+            if (!silentBuffer) {
+                silentBuffer = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+            }
+            const source = audioCtx.createBufferSource();
+            source.buffer = silentBuffer;
+            source.connect(audioCtx.destination);
+            source.start();
+        } else if (audioCtx && audioCtx.state === 'suspended' && musicEnabled) {
+            audioCtx.resume();
+        }
+    }, 3000); // Every 3 seconds (less frequent)
 }
 
 function playSound(frequency, duration, type = 'square') {
@@ -1215,22 +1261,15 @@ class PerfumeMusicPlayer {
     }
 
     cleanupNodes() {
-        // Remove finished oscillators
-        const now = this.audioCtx.currentTime;
-        this.nodes = this.nodes.filter(node => {
-            try {
-                // Keep nodes that might still be playing
-                return node.osc && node.osc.context && node.osc.context.state === 'running';
-            } catch (e) {
-                return false;
-            }
-        });
-
-        // Limit max nodes to prevent memory issues
-        if (this.nodes.length > 100) {
-            const oldNodes = this.nodes.splice(0, this.nodes.length - 50);
-            oldNodes.forEach(({ osc }) => {
-                try { osc.stop(); } catch (e) {}
+        // Aggressively limit nodes to prevent memory issues on mobile
+        if (this.nodes.length > 30) {
+            const oldNodes = this.nodes.splice(0, this.nodes.length - 20);
+            oldNodes.forEach(({ osc, gain }) => {
+                try {
+                    osc.stop();
+                    osc.disconnect();
+                    if (gain) gain.disconnect();
+                } catch (e) {}
             });
         }
     }
@@ -1256,17 +1295,53 @@ class PerfumeMusicPlayer {
 }
 
 let musicPlayer = null;
+let musicCheckInterval = null;
 
 function startMusic() {
     if (!audioCtx || !musicEnabled) return;
+
+    // Resume audio context if suspended
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+
     if (!musicPlayer) {
         musicPlayer = new PerfumeMusicPlayer(audioCtx, musicGain);
     }
     musicPlayer.start();
+
+    // Start checking if music is still playing (iOS Safari fix)
+    startMusicCheck();
 }
 
 function stopMusic() {
     if (musicPlayer) musicPlayer.stop();
+    if (musicCheckInterval) {
+        clearInterval(musicCheckInterval);
+        musicCheckInterval = null;
+    }
+}
+
+// Periodically check if music should be playing and restart if needed
+function startMusicCheck() {
+    if (musicCheckInterval) return;
+
+    musicCheckInterval = setInterval(() => {
+        if (musicEnabled && !gameOver && !paused && musicPlayer) {
+            // Check if audio context got suspended
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume().then(() => {
+                    if (!musicPlayer.isPlaying) {
+                        musicPlayer.start();
+                    }
+                });
+            }
+            // Check if music stopped unexpectedly
+            else if (!musicPlayer.isPlaying) {
+                musicPlayer.start();
+            }
+        }
+    }, 2000); // Check every 2 seconds
 }
 
 // ========================
