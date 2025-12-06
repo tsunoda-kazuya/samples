@@ -251,6 +251,42 @@ function simulateSlide(simBoard, rows, cols, holeRow, holeCol, blockRow, blockCo
     return { row, col, fellInHole: false };
 }
 
+// 逆スライド: ブロックを逆方向から引っ張ってくる
+function simulateReverseSlide(simBoard, rows, cols, holeRow, holeCol, blockRow, blockCol, dr, dc) {
+    const reverseDr = -dr;
+    const reverseDc = -dc;
+
+    let startRow = blockRow + reverseDr;
+    let startCol = blockCol + reverseDc;
+
+    // 開始位置が有効か確認
+    if (startRow < 0 || startRow >= rows || startCol < 0 || startCol >= cols) {
+        return null;
+    }
+    if (simBoard[startRow][startCol] !== null) {
+        return null;
+    }
+    if (startRow === holeRow && startCol === holeCol) {
+        return null;
+    }
+
+    // さらに奥まで探索して、ランダムな開始位置を選ぶ
+    const candidates = [{ row: startRow, col: startCol }];
+    let r = startRow + reverseDr;
+    let c = startCol + reverseDc;
+
+    while (r >= 0 && r < rows && c >= 0 && c < cols) {
+        if (simBoard[r][c] !== null || (r === holeRow && c === holeCol)) {
+            break;
+        }
+        candidates.push({ row: r, col: c });
+        r += reverseDr;
+        c += reverseDc;
+    }
+
+    return candidates[randInt(0, candidates.length - 1)];
+}
+
 // ========================================
 // BFSソルバー: 最短手数を計算
 // ========================================
