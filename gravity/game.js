@@ -1,4 +1,4 @@
-// Gravity Puzzle v1.5
+// Gravity Puzzle v1.6
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const startButton = document.getElementById('startButton');
@@ -726,17 +726,26 @@ function draw() {
 
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
         ctx.font = '12px Arial';
-        ctx.fillText('v1.5', BOARD_WIDTH/2, BOARD_HEIGHT/2 + 140);
+        ctx.fillText('v1.6', BOARD_WIDTH/2, BOARD_HEIGHT/2 + 140);
 
         ctx.fillStyle = '#fff';
-        ctx.font = '13px Arial';
-        ctx.fillText('スワイプで重力を操作', BOARD_WIDTH/2, BOARD_HEIGHT/2);
-        ctx.fillText('同じ色を3つ繋げて消そう', BOARD_WIDTH/2, BOARD_HEIGHT/2 + 20);
-        ctx.fillText('連鎖とコンボで高得点！', BOARD_WIDTH/2, BOARD_HEIGHT/2 + 40);
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'left';
+        const rulesX = 30;
+        let rulesY = BOARD_HEIGHT/2 - 15;
+        ctx.fillText('【ルール】', rulesX, rulesY);
+        ctx.fillText('・スワイプで重力の向きを変える', rulesX, rulesY += 18);
+        ctx.fillText('・ブロックは重力方向に落ちる', rulesX, rulesY += 16);
+        ctx.fillText('・同じ色を3つ繋げると消える', rulesX, rulesY += 16);
+        ctx.fillStyle = '#ffe66d';
+        ctx.fillText('・連鎖＆コンボで高得点！', rulesX, rulesY += 16);
+        ctx.fillStyle = '#ff6b6b';
+        ctx.fillText('・埋まったらゲームオーバー', rulesX, rulesY += 16);
 
         ctx.fillStyle = '#ffe66d';
-        ctx.font = 'bold 22px Arial';
-        ctx.fillText('▶ TAP TO START', BOARD_WIDTH/2, BOARD_HEIGHT/2 + 90);
+        ctx.font = 'bold 20px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('▶ TAP TO START', BOARD_WIDTH/2, BOARD_HEIGHT/2 + 100);
     } else if (gameOver) {
         ctx.fillStyle = 'rgba(0,0,0,0.8)';
         ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
