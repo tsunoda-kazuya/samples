@@ -298,7 +298,7 @@ function stateToKey(blocks, nextNum) {
     return sorted.map(b => `${b.number}:${b.row},${b.col}`).join('|') + `#${nextNum}`;
 }
 
-// BFSで最短手数を求める
+// BFSで最短手数を求める（押し出し機能対応）
 function solvePuzzle(blocks, obstacles, hole, rows, cols) {
     const directions = [
         { dr: -1, dc: 0 }, { dr: 1, dc: 0 },
@@ -317,7 +317,8 @@ function solvePuzzle(blocks, obstacles, hole, rows, cols) {
     const obstacleMap = new Set();
     obstacles.forEach(o => obstacleMap.add(`${o.row},${o.col}`));
 
-    const maxMoves = 50; // 探索上限
+    const maxMoves = 25; // 探索上限（軽量化）
+    const maxVisited = 10000; // 訪問状態数の上限
 
     while (queue.length > 0) {
         const [currentBlocks, nextNum, moveCount] = queue.shift();
@@ -329,17 +330,18 @@ function solvePuzzle(blocks, obstacles, hole, rows, cols) {
 
         // 探索上限
         if (moveCount >= maxMoves) continue;
+        if (visited.size > maxVisited) return -1; // 状態数が多すぎたら諦める
 
         // 各ブロックを各方向に動かしてみる
         for (let bi = 0; bi < currentBlocks.length; bi++) {
             const block = currentBlocks[bi];
 
             for (const dir of directions) {
-                // ボードを作成
+                // ボードマップを作成（動かすブロック以外）
                 const boardMap = new Map();
                 currentBlocks.forEach((b, idx) => {
                     if (idx !== bi) {
-                        boardMap.set(`${b.row},${b.col}`, b);
+                        boardMap.set(`${b.row},${b.col}`, { ...b, idx: idx });
                     }
                 });
 
@@ -349,12 +351,14 @@ function solvePuzzle(blocks, obstacles, hole, rows, cols) {
 
                 if (adjRow < 0 || adjRow >= rows || adjCol < 0 || adjCol >= cols) continue;
                 if (obstacleMap.has(`${adjRow},${adjCol}`)) continue;
+                // 隣にブロックがあったら動けない（押し出しは滑った先で発生）
                 if (boardMap.has(`${adjRow},${adjCol}`)) continue;
 
                 // スライド先を計算
                 let r = block.row;
                 let c = block.col;
                 let fellInHole = false;
+                let hitBlockKey = null;
 
                 while (true) {
                     const nr = r + dir.dr;
@@ -366,7 +370,10 @@ function solvePuzzle(blocks, obstacles, hole, rows, cols) {
                         break;
                     }
                     if (obstacleMap.has(`${nr},${nc}`)) break;
-                    if (boardMap.has(`${nr},${nc}`)) break;
+                    if (boardMap.has(`${nr},${nc}`)) {
+                        hitBlockKey = `${nr},${nc}`;
+                        break;
+                    }
 
                     r = nr;
                     c = nc;
@@ -376,22 +383,71 @@ function solvePuzzle(blocks, obstacles, hole, rows, cols) {
                 if (r === block.row && c === block.col && !fellInHole) continue;
 
                 // 新しい状態を作成
-                let newBlocks, newNextNum;
+                let newBlocks = currentBlocks.map(b => ({ ...b }));
+                let newNextNum = nextNum;
 
                 if (fellInHole) {
                     // 正しい順番で落ちたか？
                     if (block.number === nextNum) {
-                        newBlocks = currentBlocks.filter((_, idx) => idx !== bi);
+                        newBlocks = newBlocks.filter((_, idx) => idx !== bi);
                         newNextNum = nextNum + 1;
                     } else {
-                        // 順番違い = この経路は無効
-                        continue;
+                        continue; // 順番違い
                     }
                 } else {
-                    newBlocks = currentBlocks.map((b, idx) =>
-                        idx === bi ? { ...b, row: r, col: c } : { ...b }
-                    );
-                    newNextNum = nextNum;
+                    // ブロックを移動
+                    newBlocks[bi] = { ...newBlocks[bi], row: r, col: c };
+
+                    // 押し出し処理: 滑った先にブロックがあった場合
+                    if (hitBlockKey) {
+                        const hitBlock = boardMap.get(hitBlockKey);
+                        const hitIdx = hitBlock.idx;
+
+                        // 押し出されるブロックのスライド先を計算
+                        let pr = hitBlock.row;
+                        let pc = hitBlock.col;
+                        let pushedFellInHole = false;
+
+                        // 押し出し用のボードマップ（動かしたブロックの新位置を含む）
+                        const pushBoardMap = new Map();
+                        newBlocks.forEach((b, idx) => {
+                            if (idx !== hitIdx) {
+                                pushBoardMap.set(`${b.row},${b.col}`, b);
+                            }
+                        });
+
+                        while (true) {
+                            const pnr = pr + dir.dr;
+                            const pnc = pc + dir.dc;
+
+                            if (pnr < 0 || pnr >= rows || pnc < 0 || pnc >= cols) break;
+                            if (pnr === hole.row && pnc === hole.col) {
+                                pushedFellInHole = true;
+                                break;
+                            }
+                            if (obstacleMap.has(`${pnr},${pnc}`)) break;
+                            if (pushBoardMap.has(`${pnr},${pnc}`)) break;
+
+                            pr = pnr;
+                            pc = pnc;
+                        }
+
+                        // 押し出されたブロックが動けない場合はこの手は無効
+                        if (pr === hitBlock.row && pc === hitBlock.col && !pushedFellInHole) {
+                            continue;
+                        }
+
+                        if (pushedFellInHole) {
+                            if (hitBlock.number === newNextNum) {
+                                newBlocks = newBlocks.filter((_, idx) => idx !== hitIdx);
+                                newNextNum = newNextNum + 1;
+                            } else {
+                                continue; // 順番違い
+                            }
+                        } else {
+                            newBlocks[hitIdx] = { ...newBlocks[hitIdx], row: pr, col: pc };
+                        }
+                    }
                 }
 
                 const newKey = stateToKey(newBlocks, newNextNum);
@@ -426,8 +482,8 @@ function generatePuzzle(stageNum) {
         { dr: 0, dc: -1 }, { dr: 0, dc: 1 }
     ];
 
-    // 有効なパズルが生成されるまで繰り返す
-    for (let attempt = 0; attempt < 100; attempt++) {
+    // 有効なパズルが生成されるまで繰り返す（最大30回で軽量化）
+    for (let attempt = 0; attempt < 30; attempt++) {
         // ホールの位置（ランダム端）
         const holePositions = [];
         for (let c = 0; c < cols; c++) holePositions.push({ row: 0, col: c });
@@ -518,7 +574,7 @@ function generatePuzzle(stageNum) {
         }
 
         // 逆シャッフル（ゴール状態から離す）
-        const shuffleCount = targetMinMoves * 3; // 多めにシャッフル
+        const shuffleCount = targetMinMoves * 2; // 適度にシャッフル
         for (let move = 0; move < shuffleCount; move++) {
             const blockIdx = randInt(0, blocks.length - 1);
             const block = blocks[blockIdx];
@@ -543,9 +599,8 @@ function generatePuzzle(stageNum) {
 
         // 解があり、適切な難易度の場合採用
         if (minMoves > 0 && minMoves >= numBlocks) {
-            // Par = 最短手数 + 1〜2手のバッファ
-            const buffer = Math.min(2, Math.max(1, Math.floor(minMoves / 5)));
-            const par = minMoves + buffer;
+            // Par = 最短手数そのまま（ソルバーは押し出し未考慮なので余裕あり）
+            const par = minMoves;
 
             return {
                 blocks: blocks.map(b => ({ row: b.row, col: b.col, number: b.number })),
