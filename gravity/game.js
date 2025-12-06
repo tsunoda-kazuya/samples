@@ -1,4 +1,4 @@
-// Gravity Puzzle v1.2
+// Gravity Puzzle v1.3
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const startButton = document.getElementById('startButton');
@@ -36,7 +36,6 @@ function playTone(freq, duration, type = 'sine', volume = 0.3) {
 // Sound effects
 function playMatchSound(chainCount) {
     if (!audioCtx) return;
-    // Higher pitch for longer chains
     const baseFreq = 440 + (chainCount - 1) * 100;
     playTone(baseFreq, 0.15, 'sine', 0.4);
     setTimeout(() => playTone(baseFreq * 1.25, 0.15, 'sine', 0.3), 50);
@@ -64,8 +63,8 @@ function playSpawnSound() {
 // BGM using simple oscillators
 let bgmInterval = null;
 const bgmNotes = [
-    262, 294, 330, 349, 392, 440, 494, 523, // C major scale
-    523, 494, 440, 392, 349, 330, 294, 262  // descending
+    262, 294, 330, 349, 392, 440, 494, 523,
+    523, 494, 440, 392, 349, 330, 294, 262
 ];
 let bgmNoteIndex = 0;
 
@@ -95,7 +94,7 @@ function stopBGM() {
 const COLS = 6;
 const ROWS = 8;
 const COLORS = ['#ff6b6b', '#4ecdc4', '#ffe66d', '#95e1d3'];
-const MATCH_COUNT = 3; // Number needed to match
+const MATCH_COUNT = 3;
 
 // Responsive sizing
 let CELL_SIZE;
@@ -115,39 +114,31 @@ window.addEventListener('resize', resizeCanvas);
 
 // Game state
 let board = [];
-let gravity = { x: 0, y: 1 }; // Default: down
+let gravity = { x: 0, y: 1 };
 let score = 0;
 let chainCount = 0;
 let gameRunning = false;
 let gameOver = false;
 let gamePaused = false;
 let gameStarted = false;
-let orientationPermission = false;
-let isProcessing = false; // Prevent input during chain resolution
-
-// Device orientation data
-let tiltX = 0;
-let tiltY = 0;
+let isProcessing = false;
 
 // Get a color that won't create a match at position
 function getSafeColor(row, col) {
     const forbidden = new Set();
 
-    // Check horizontal (left)
     if (col >= 2) {
         const c1 = board[row][col-1]?.color;
         const c2 = board[row][col-2]?.color;
         if (c1 && c1 === c2) forbidden.add(c1);
     }
 
-    // Check vertical (up)
     if (row >= 2) {
         const c1 = board[row-1]?.[col]?.color;
         const c2 = board[row-2]?.[col]?.color;
         if (c1 && c1 === c2) forbidden.add(c1);
     }
 
-    // Filter available colors
     const available = COLORS.filter(c => !forbidden.has(c));
     return available.length > 0
         ? available[Math.floor(Math.random() * available.length)]
@@ -164,7 +155,6 @@ function initBoard() {
         }
     }
 
-    // Fill bottom half with non-matching blocks
     for (let row = ROWS - 4; row < ROWS; row++) {
         for (let col = 0; col < COLS; col++) {
             board[row][col] = {
@@ -180,55 +170,6 @@ function initBoard() {
     scoreDisplay.textContent = `Score: ${score}`;
 }
 
-// Request device orientation permission (iOS 13+)
-async function requestOrientationPermission() {
-    debugInfo.textContent = '傾き許可リクエスト中...';
-
-    if (typeof DeviceOrientationEvent !== 'undefined' &&
-        typeof DeviceOrientationEvent.requestPermission === 'function') {
-        // iOS 13+ requires permission request
-        try {
-            const response = await DeviceOrientationEvent.requestPermission();
-            console.log('Orientation permission response:', response);
-            if (response === 'granted') {
-                orientationPermission = true;
-                window.addEventListener('deviceorientation', handleOrientation);
-                debugInfo.textContent = '傾き検知: 有効';
-                return true;
-            } else {
-                debugInfo.textContent = '傾き検知: 拒否（スワイプで操作）';
-                return false;
-            }
-        } catch (e) {
-            console.log('Orientation error:', e);
-            debugInfo.textContent = '傾き検知: エラー';
-            return false;
-        }
-    } else if (window.DeviceOrientationEvent) {
-        // Android or older iOS - no permission needed
-        window.addEventListener('deviceorientation', handleOrientation);
-        orientationPermission = true;
-        debugInfo.textContent = '傾き検知: 有効';
-        return true;
-    } else {
-        // No orientation support
-        debugInfo.textContent = '傾き非対応（スワイプで操作）';
-        return false;
-    }
-}
-
-// Handle device orientation
-let hasRealOrientationData = false;
-
-function handleOrientation(event) {
-    // Check if we're getting real orientation data (not just zeros)
-    if (event.beta !== null && event.gamma !== null) {
-        hasRealOrientationData = true;
-        tiltX = event.beta;
-        tiltY = event.gamma;
-    }
-}
-
 function getGravityDirection() {
     if (gravity.y > 0) return '↓';
     if (gravity.y < 0) return '↑';
@@ -237,51 +178,10 @@ function getGravityDirection() {
     return '•';
 }
 
-// Update gravity based on tilt
-function updateGravityFromTilt() {
-    if (isProcessing) return;
-
-    // beta (tiltX): 前後の傾き。スマホを普通に持つと約45-60度
-    // gamma (tiltY): 左右の傾き。-90〜90度
-
-    // 基準角度（ニュートラル位置）
-    const baseAngle = 50;
-    const threshold = 25;       // 左右・下の閾値
-    const upThreshold = 40;     // 上方向は更に傾けないと反応しない
-
-    // 前後の傾きを基準角度からの差分として計算
-    const forwardBack = tiltX - baseAngle;
-    // 左右の傾きはそのまま
-    const leftRight = tiltY;
-
-    let newGravity = { ...gravity };
-
-    // 左右を優先判定（閾値を超えていれば）
-    if (Math.abs(leftRight) > threshold) {
-        if (leftRight > 0) {
-            newGravity = { x: 1, y: 0 }; // 右
-        } else {
-            newGravity = { x: -1, y: 0 }; // 左
-        }
-    }
-    // 前後の傾きが大きい場合（上方向は専用閾値）
-    else if (forwardBack > threshold) {
-        newGravity = { x: 0, y: 1 }; // 下（手前に倒す）
-    }
-    else if (forwardBack < -upThreshold) {
-        newGravity = { x: 0, y: -1 }; // 上（奥に大きく倒す）
-    }
-
-    if (newGravity.x !== gravity.x || newGravity.y !== gravity.y) {
-        gravity = newGravity;
-    }
-}
-
 // Apply gravity - returns true if any block moved
 function applyGravity() {
     let moved = false;
 
-    // Determine iteration order based on gravity
     const rowOrder = gravity.y > 0 ?
         [...Array(ROWS).keys()].reverse() :
         [...Array(ROWS).keys()];
@@ -295,7 +195,6 @@ function applyGravity() {
                 let newRow = row;
                 let newCol = col;
 
-                // Move as far as possible in gravity direction
                 while (true) {
                     const nextRow = newRow + gravity.y;
                     const nextCol = newCol + gravity.x;
@@ -310,7 +209,6 @@ function applyGravity() {
 
                 if (newRow !== row || newCol !== col) {
                     const block = board[row][col];
-                    // Set animation offset from old position
                     block.animX = (col - newCol) * CELL_SIZE;
                     block.animY = (row - newRow) * CELL_SIZE;
                     board[newRow][newCol] = block;
@@ -333,7 +231,6 @@ function findConnected(row, col, color, visited) {
     visited.add(`${row},${col}`);
     let connected = [{row, col}];
 
-    // Check 4 directions
     connected = connected.concat(findConnected(row-1, col, color, visited));
     connected = connected.concat(findConnected(row+1, col, color, visited));
     connected = connected.concat(findConnected(row, col-1, color, visited));
@@ -342,22 +239,17 @@ function findConnected(row, col, color, visited) {
     return connected;
 }
 
-// Find and remove matches - returns number of blocks removed
+// Find and remove matches
 function findAndRemoveMatches() {
     const toRemove = new Set();
-
-    // Check all blocks for groups of 3+
     const checked = new Set();
 
     for (let row = 0; row < ROWS; row++) {
         for (let col = 0; col < COLS; col++) {
             if (board[row][col] && !checked.has(`${row},${col}`)) {
                 const connected = findConnected(row, col, board[row][col].color, new Set());
-
-                // Mark as checked
                 connected.forEach(pos => checked.add(`${pos.row},${pos.col}`));
 
-                // If 3 or more connected, mark for removal
                 if (connected.length >= MATCH_COUNT) {
                     connected.forEach(pos => toRemove.add(`${pos.row},${pos.col}`));
                 }
@@ -365,7 +257,6 @@ function findAndRemoveMatches() {
         }
     }
 
-    // Remove matched blocks
     if (toRemove.size > 0) {
         chainCount++;
         const chainBonus = chainCount > 1 ? chainCount : 1;
@@ -373,7 +264,6 @@ function findAndRemoveMatches() {
         score += points;
         scoreDisplay.textContent = `Score: ${score}`;
 
-        // Play match sound
         playMatchSound(chainCount);
 
         if (chainCount > 1) {
@@ -391,32 +281,29 @@ function findAndRemoveMatches() {
     return 0;
 }
 
-// Add new blocks from the opposite side of gravity (with animation offset)
+// Add new blocks from the opposite side of gravity
 function addNewBlocks(count) {
     const added = [];
-
-    // Determine spawn edge based on gravity
     let spawnPositions = [];
 
-    if (gravity.y > 0) { // Gravity down, spawn from top
+    if (gravity.y > 0) {
         for (let col = 0; col < COLS; col++) {
             if (!board[0][col]) spawnPositions.push({row: 0, col, offsetY: -CELL_SIZE * 2});
         }
-    } else if (gravity.y < 0) { // Gravity up, spawn from bottom
+    } else if (gravity.y < 0) {
         for (let col = 0; col < COLS; col++) {
             if (!board[ROWS-1][col]) spawnPositions.push({row: ROWS-1, col, offsetY: CELL_SIZE * 2});
         }
-    } else if (gravity.x > 0) { // Gravity right, spawn from left
+    } else if (gravity.x > 0) {
         for (let row = 0; row < ROWS; row++) {
             if (!board[row][0]) spawnPositions.push({row, col: 0, offsetX: -CELL_SIZE * 2});
         }
-    } else { // Gravity left, spawn from right
+    } else {
         for (let row = 0; row < ROWS; row++) {
             if (!board[row][COLS-1]) spawnPositions.push({row, col: COLS-1, offsetX: CELL_SIZE * 2});
         }
     }
 
-    // Shuffle and pick positions
     spawnPositions.sort(() => Math.random() - 0.5);
     const toAdd = Math.min(count, spawnPositions.length);
 
@@ -424,7 +311,6 @@ function addNewBlocks(count) {
         const pos = spawnPositions[i];
         board[pos.row][pos.col] = {
             color: getSafeColor(pos.row, pos.col),
-            // Animation offset - block will animate from this position
             animX: pos.offsetX || 0,
             animY: pos.offsetY || 0
         };
@@ -446,15 +332,13 @@ function countEmpty() {
     return count;
 }
 
-// Count filled cells
 function countBlocks() {
     return ROWS * COLS - countEmpty();
 }
 
-// Check if game is over (board is full and no matches possible)
+// Check if game is over
 function checkGameOver() {
     if (countEmpty() === 0) {
-        // Check if any matches exist
         const checked = new Set();
         for (let row = 0; row < ROWS; row++) {
             for (let col = 0; col < COLS; col++) {
@@ -462,12 +346,12 @@ function checkGameOver() {
                     const connected = findConnected(row, col, board[row][col].color, new Set());
                     connected.forEach(pos => checked.add(`${pos.row},${pos.col}`));
                     if (connected.length >= MATCH_COUNT) {
-                        return false; // Match exists
+                        return false;
                     }
                 }
             }
         }
-        return true; // No matches, game over
+        return true;
     }
     return false;
 }
@@ -478,19 +362,16 @@ async function processChains() {
     chainCount = 0;
 
     while (true) {
-        // Apply gravity until stable
         while (applyGravity()) {
             await sleep(50);
         }
 
-        // Check for matches
         const removed = findAndRemoveMatches();
         if (removed === 0) break;
 
         await sleep(200);
     }
 
-    // Check game over
     if (checkGameOver()) {
         gameOver = true;
         stopBGM();
@@ -507,11 +388,9 @@ function sleep(ms) {
 
 // Draw game
 function draw() {
-    // Clear canvas
     ctx.fillStyle = '#1a1a2e';
     ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
 
-    // Draw grid
     ctx.strokeStyle = '#2a2a4e';
     ctx.lineWidth = 1;
     for (let row = 0; row <= ROWS; row++) {
@@ -527,13 +406,11 @@ function draw() {
         ctx.stroke();
     }
 
-    // Draw blocks with animation
     for (let row = 0; row < ROWS; row++) {
-        if (!board[row]) continue; // Skip if row not initialized
+        if (!board[row]) continue;
         for (let col = 0; col < COLS; col++) {
             const block = board[row][col];
             if (block) {
-                // Animate offset towards 0
                 if (block.animX) block.animX *= 0.85;
                 if (block.animY) block.animY *= 0.85;
                 if (Math.abs(block.animX || 0) < 1) block.animX = 0;
@@ -556,9 +433,16 @@ function draw() {
     ctx.textBaseline = 'middle';
     ctx.fillText(getGravityDirection(), BOARD_WIDTH/2, BOARD_HEIGHT/2);
 
+    // Draw touch indicator when touching
+    if (activeTouchId !== null && gameStarted && !gameOver && !gamePaused) {
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.beginPath();
+        ctx.arc(touchCurrentX, touchCurrentY, 30, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
     // Draw overlays
     if (!gameStarted) {
-        // Start screen
         ctx.fillStyle = 'rgba(0,0,0,0.8)';
         ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
 
@@ -569,21 +453,19 @@ function draw() {
         ctx.fillText('GRAVITY', BOARD_WIDTH/2, BOARD_HEIGHT/2 - 60);
         ctx.fillText('PUZZLE', BOARD_WIDTH/2, BOARD_HEIGHT/2 - 25);
 
-        // Version number
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
         ctx.font = '12px Arial';
-        ctx.fillText('v1.2', BOARD_WIDTH/2, BOARD_HEIGHT/2 + 130);
+        ctx.fillText('v1.3', BOARD_WIDTH/2, BOARD_HEIGHT/2 + 130);
 
         ctx.fillStyle = '#fff';
         ctx.font = '14px Arial';
-        ctx.fillText('スマホを傾けて重力を操作', BOARD_WIDTH/2, BOARD_HEIGHT/2 + 15);
+        ctx.fillText('スワイプで重力を操作', BOARD_WIDTH/2, BOARD_HEIGHT/2 + 15);
         ctx.fillText('同じ色を3つ繋げて消そう', BOARD_WIDTH/2, BOARD_HEIGHT/2 + 38);
 
         ctx.fillStyle = '#ffe66d';
         ctx.font = 'bold 20px Arial';
         ctx.fillText('▶ タップでスタート', BOARD_WIDTH/2, BOARD_HEIGHT/2 + 90);
     } else if (gameOver) {
-        // Game over screen
         ctx.fillStyle = 'rgba(0,0,0,0.7)';
         ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
 
@@ -601,7 +483,6 @@ function draw() {
         ctx.font = '18px Arial';
         ctx.fillText('タップでリスタート', BOARD_WIDTH/2, BOARD_HEIGHT/2 + 55);
     } else if (gamePaused) {
-        // Pause screen
         ctx.fillStyle = 'rgba(0,0,0,0.7)';
         ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
 
@@ -618,8 +499,6 @@ function draw() {
 }
 
 // Handle gravity change
-let lastGravity = { x: 0, y: 1 };
-
 function setGravity(newGravity) {
     if (isProcessing || gameOver) return;
     if (newGravity.x === gravity.x && newGravity.y === gravity.y) return;
@@ -631,7 +510,6 @@ function setGravity(newGravity) {
 
 // Keyboard controls
 document.addEventListener('keydown', (e) => {
-    // Space or Escape to pause/unpause
     if (e.key === ' ' || e.key === 'Escape') {
         if (gameStarted && !gameOver) {
             gamePaused = !gamePaused;
@@ -639,7 +517,6 @@ document.addEventListener('keydown', (e) => {
         return;
     }
 
-    // Enter to start/restart
     if (e.key === 'Enter') {
         if (!gameStarted) {
             initAudio();
@@ -675,96 +552,168 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Touch/click handler
-canvas.addEventListener('click', async (e) => {
+// ===============================
+// TOUCH CONTROLS (Mario-style continuous tracking)
+// ===============================
+
+let activeTouchId = null;
+let touchStartX = 0;
+let touchStartY = 0;
+let touchCurrentX = 0;
+let touchCurrentY = 0;
+let lastGravityFromTouch = null;
+const DEAD_ZONE = 15;  // Minimum distance to register direction
+
+function getDirectionFromTouch() {
+    const dx = touchCurrentX - touchStartX;
+    const dy = touchCurrentY - touchStartY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance < DEAD_ZONE) {
+        return null;
+    }
+
+    // Determine direction based on angle
+    if (Math.abs(dx) > Math.abs(dy)) {
+        // Horizontal
+        return dx > 0 ? { x: 1, y: 0 } : { x: -1, y: 0 };
+    } else {
+        // Vertical
+        return dy > 0 ? { x: 0, y: 1 } : { x: 0, y: -1 };
+    }
+}
+
+function updateGravityFromTouch() {
+    if (!gameStarted || gameOver || gamePaused || isProcessing) return;
+
+    const newDirection = getDirectionFromTouch();
+    if (newDirection) {
+        // Only trigger if direction changed
+        if (!lastGravityFromTouch ||
+            newDirection.x !== lastGravityFromTouch.x ||
+            newDirection.y !== lastGravityFromTouch.y) {
+            lastGravityFromTouch = newDirection;
+            setGravity(newDirection);
+        }
+    }
+}
+
+// Handle touch start - also handles tap for start/restart/resume
+canvas.addEventListener('touchstart', (e) => {
+    const touch = e.touches[0];
+
+    // Handle game state transitions on tap
     if (!gameStarted) {
-        // Start game
         initAudio();
-        await requestOrientationPermission();
         initBoard();
         gameStarted = true;
         gameRunning = true;
-        lastBlockSpawn = performance.now(); // Reset spawn timer
+        lastBlockSpawn = performance.now();
         startBGM();
-    } else if (gameOver) {
-        // Restart
+        e.preventDefault();
+        return;
+    }
+
+    if (gameOver) {
         initBoard();
         gameOver = false;
-        lastBlockSpawn = performance.now(); // Reset spawn timer
+        lastBlockSpawn = performance.now();
         startBGM();
-    } else if (gamePaused) {
-        // Resume
-        gamePaused = false;
+        e.preventDefault();
+        return;
     }
-});
 
-// Swipe controls for mobile (fallback when orientation not available)
-let touchStartX = 0;
-let touchStartY = 0;
-let touchStartTime = 0;
+    if (gamePaused) {
+        gamePaused = false;
+        e.preventDefault();
+        return;
+    }
 
-canvas.addEventListener('touchstart', (e) => {
-    if (!gameStarted || gameOver || gamePaused) return;
-    const touch = e.touches[0];
-    touchStartX = touch.clientX;
-    touchStartY = touch.clientY;
-    touchStartTime = Date.now();
-}, { passive: true });
-
-canvas.addEventListener('touchend', (e) => {
-    if (!gameStarted || gameOver || gamePaused || isProcessing) return;
-    if (orientationPermission) return; // Use tilt instead
-
-    const touch = e.changedTouches[0];
-    const dx = touch.clientX - touchStartX;
-    const dy = touch.clientY - touchStartY;
-    const dt = Date.now() - touchStartTime;
-
-    // Require minimum swipe distance and speed
-    const minDist = 30;
-    const maxTime = 500;
-
-    if (dt > maxTime) return;
-    if (Math.abs(dx) < minDist && Math.abs(dy) < minDist) return;
+    // Start tracking touch for swipe
+    if (activeTouchId === null) {
+        activeTouchId = touch.identifier;
+        const rect = canvas.getBoundingClientRect();
+        touchStartX = touch.clientX - rect.left;
+        touchStartY = touch.clientY - rect.top;
+        touchCurrentX = touchStartX;
+        touchCurrentY = touchStartY;
+        lastGravityFromTouch = null;
+    }
 
     e.preventDefault();
+}, { passive: false });
 
-    if (Math.abs(dx) > Math.abs(dy)) {
-        // Horizontal swipe
-        if (dx > 0) {
-            setGravity({ x: 1, y: 0 }); // Right
-        } else {
-            setGravity({ x: -1, y: 0 }); // Left
-        }
-    } else {
-        // Vertical swipe
-        if (dy > 0) {
-            setGravity({ x: 0, y: 1 }); // Down
-        } else {
-            setGravity({ x: 0, y: -1 }); // Up
+// Handle touch move - continuous direction tracking
+canvas.addEventListener('touchmove', (e) => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (touch.identifier === activeTouchId) {
+            const rect = canvas.getBoundingClientRect();
+            touchCurrentX = touch.clientX - rect.left;
+            touchCurrentY = touch.clientY - rect.top;
+
+            // Update gravity continuously while moving
+            updateGravityFromTouch();
+
+            e.preventDefault();
+            break;
         }
     }
 }, { passive: false });
 
+// Handle touch end
+canvas.addEventListener('touchend', (e) => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === activeTouchId) {
+            // One final check on release
+            updateGravityFromTouch();
+
+            activeTouchId = null;
+            lastGravityFromTouch = null;
+            break;
+        }
+    }
+}, { passive: true });
+
+// Handle touch cancel
+canvas.addEventListener('touchcancel', (e) => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === activeTouchId) {
+            activeTouchId = null;
+            lastGravityFromTouch = null;
+            break;
+        }
+    }
+}, { passive: true });
+
+// Click handler for PC
+canvas.addEventListener('click', (e) => {
+    // Only handle click if not a touch device (touch events handle this)
+    if ('ontouchstart' in window) return;
+
+    if (!gameStarted) {
+        initAudio();
+        initBoard();
+        gameStarted = true;
+        gameRunning = true;
+        lastBlockSpawn = performance.now();
+        startBGM();
+    } else if (gameOver) {
+        initBoard();
+        gameOver = false;
+        lastBlockSpawn = performance.now();
+        startBGM();
+    } else if (gamePaused) {
+        gamePaused = false;
+    }
+});
+
 // Game loop
-let lastOrientationCheck = 0;
 let lastBlockSpawn = 0;
-const SPAWN_INTERVAL = 3000; // New block every 3 seconds
+const SPAWN_INTERVAL = 3000;
 
 function gameLoop(timestamp) {
     if (gameRunning && !gameOver && !gamePaused && gameStarted) {
-        // Update gravity from device orientation (throttled)
-        // Only if we have real orientation data (not PC with fake support)
-        if (orientationPermission && hasRealOrientationData && timestamp - lastOrientationCheck > 200) {
-            lastOrientationCheck = timestamp;
-            const oldGravity = { ...gravity };
-            updateGravityFromTilt();
-            if (oldGravity.x !== gravity.x || oldGravity.y !== gravity.y) {
-                playGravityChangeSound();
-                processChains();
-            }
-        }
-
         // Spawn new blocks periodically
         if (!isProcessing && timestamp - lastBlockSpawn > SPAWN_INTERVAL) {
             lastBlockSpawn = timestamp;
@@ -772,11 +721,7 @@ function gameLoop(timestamp) {
         }
 
         // Update debug info
-        if (orientationPermission && hasRealOrientationData) {
-            debugInfo.innerHTML = `傾き β:${tiltX.toFixed(0)}° γ:${tiltY.toFixed(0)}°<br>ブロック: ${countBlocks()}`;
-        } else {
-            debugInfo.innerHTML = `矢印キー操作 / Space:ポーズ<br>ブロック: ${countBlocks()}`;
-        }
+        debugInfo.innerHTML = `スワイプで操作<br>ブロック: ${countBlocks()}`;
     }
 
     draw();
@@ -790,22 +735,18 @@ async function spawnNewBlock() {
     const added = addNewBlocks(1);
     if (added.length > 0) {
         playSpawnSound();
-        // Process gravity for the new block
         isProcessing = true;
         while (applyGravity()) {
             await sleep(50);
         }
-        // Check for matches
         const removed = findAndRemoveMatches();
         if (removed > 0) {
             await sleep(200);
-            // Continue chain
             await processChains();
         } else {
             isProcessing = false;
         }
 
-        // Check game over
         if (checkGameOver()) {
             gameOver = true;
             stopBGM();
