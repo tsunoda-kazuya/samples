@@ -1,4 +1,4 @@
-// 氷の世界 v1.8
+// 氷の世界 v1.9
 // スマホ専用スライディングパズル
 // 逆算式パズル自動生成
 // Retina対応
@@ -961,7 +961,7 @@ function drawTitleScreen() {
 
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.font = '10px Arial';
-    ctx.fillText('v1.8', BOARD_WIDTH/2, BOARD_HEIGHT - 12);
+    ctx.fillText('v1.9', BOARD_WIDTH/2, BOARD_HEIGHT - 12);
 }
 
 function drawClearScreen() {
