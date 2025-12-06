@@ -155,22 +155,34 @@ function getGravityDirection() {
 function updateGravityFromTilt() {
     if (isProcessing) return;
 
-    const threshold = 25;
-    const adjustedTiltX = tiltX - 45;
+    // beta (tiltX): 前後の傾き。スマホを普通に持つと約45-60度
+    // gamma (tiltY): 左右の傾き。-90〜90度
+
+    // 基準角度を60度に（スマホを少し立てて持つ想定）
+    const baseAngle = 60;
+    const threshold = 20;
+
+    // 前後の傾きを基準角度からの差分として計算
+    const forwardBack = tiltX - baseAngle;
+    // 左右の傾きはそのまま
+    const leftRight = tiltY;
 
     let newGravity = { ...gravity };
 
-    if (Math.abs(tiltY) > Math.abs(adjustedTiltX)) {
-        if (tiltY > threshold) {
-            newGravity = { x: 1, y: 0 };
-        } else if (tiltY < -threshold) {
-            newGravity = { x: -1, y: 0 };
+    // 左右の傾きが大きい場合
+    if (Math.abs(leftRight) > threshold && Math.abs(leftRight) > Math.abs(forwardBack)) {
+        if (leftRight > 0) {
+            newGravity = { x: 1, y: 0 }; // 右
+        } else {
+            newGravity = { x: -1, y: 0 }; // 左
         }
-    } else {
-        if (adjustedTiltX > threshold) {
-            newGravity = { x: 0, y: 1 };
-        } else if (adjustedTiltX < -threshold) {
-            newGravity = { x: 0, y: -1 };
+    }
+    // 前後の傾きが大きい場合
+    else if (Math.abs(forwardBack) > threshold) {
+        if (forwardBack > 0) {
+            newGravity = { x: 0, y: 1 }; // 下（手前に倒す）
+        } else {
+            newGravity = { x: 0, y: -1 }; // 上（奥に倒す）
         }
     }
 
