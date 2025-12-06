@@ -1,4 +1,4 @@
-// 氷の世界 v2.3
+// 氷の世界 v2.4
 // スマホ専用スライディングパズル
 // BFSソルバーで最短解を保証（押し出し対応）
 // Retina対応
@@ -617,8 +617,9 @@ function generatePuzzle(stageNum) {
         }
 
         // ソルバーを使わない場合：逆算パズルは必ず解があるのでそのまま採用
-        // Par = ブロック数 + シャッフル回数の一部
-        const estimatedPar = numBlocks + Math.ceil(shuffleCount / 4);
+        // Par = ブロック数 + 固定バッファ（2〜3手）
+        const buffer = Math.min(3, Math.max(2, Math.floor(numBlocks / 3)));
+        const estimatedPar = numBlocks + buffer;
 
         return {
             blocks: blocks.map(b => ({ row: b.row, col: b.col, number: b.number })),
@@ -1231,7 +1232,7 @@ function drawTitleScreen() {
 
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.font = '10px Arial';
-    ctx.fillText('v2.3', BOARD_WIDTH/2, BOARD_HEIGHT - 12);
+    ctx.fillText('v2.4', BOARD_WIDTH/2, BOARD_HEIGHT - 12);
 }
 
 function drawClearScreen() {
