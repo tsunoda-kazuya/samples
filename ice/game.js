@@ -429,13 +429,18 @@ function generatePuzzle(stageNum) {
         }
     }
 
+    // Par計算: ブロック数 + 固定バッファ（2〜3手）
+    // 面が進んでも難易度が均一になるよう固定値
+    const buffer = Math.min(3, Math.max(2, Math.floor(numBlocks / 3)));
+    const basePar = numBlocks + buffer;
+
     return {
         blocks: blocks.map(b => ({ row: b.row, col: b.col, number: b.number })),
         obstacles: obstacles,
         hole: { row: holeRow, col: holeCol },
         rows: rows,
         cols: cols,
-        par: numBlocks + Math.floor(shuffleMoves / 3)  // Par = ブロック数 + シャッフル/3
+        par: basePar
     };
 }
 
