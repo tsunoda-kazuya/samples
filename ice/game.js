@@ -179,6 +179,7 @@ let gameStarted = false;
 let gameCleared = false;
 let gameFailed = false;
 let failedBlockNumber = 0;
+let failedByPar = false;  // Par超えで失敗したかどうか
 let gamePaused = false;
 let isAnimating = false;
 
@@ -470,6 +471,7 @@ function initStage(stageNum) {
     gameCleared = false;
     gameFailed = false;
     failedBlockNumber = 0;
+    failedByPar = false;
     selectedBlock = null;
     animatingBlocks = [];
     isAnimating = false;
@@ -698,6 +700,15 @@ async function executeSlide(row, col, direction) {
 
     moves++;
     updateDisplay();
+
+    // Par超えチェック（まだブロックが残っている場合）
+    if (moves > parMoves && !checkStageClear()) {
+        playFailSound();
+        failedByPar = true;
+        gameFailed = true;
+        isAnimating = false;
+        return;
+    }
 
     // 2. 押し出しブロックのアニメーション（当たってから動く）
     if (willPush && pushResult) {
@@ -1048,11 +1059,16 @@ function drawFailScreen() {
     ctx.textAlign = 'center';
     ctx.fillText('FAILED!', BOARD_WIDTH/2, BOARD_HEIGHT/2 - 70);
 
-    // 説明
+    // 説明（失敗理由によって変える）
     ctx.fillStyle = '#fff';
     ctx.font = '14px Arial';
-    ctx.fillText(failedBlockNumber + 'を落とした！', BOARD_WIDTH/2, BOARD_HEIGHT/2 - 35);
-    ctx.fillText(nextNumber + 'が必要だった', BOARD_WIDTH/2, BOARD_HEIGHT/2 - 15);
+    if (failedByPar) {
+        ctx.fillText('Par ' + parMoves + '手を超えた！', BOARD_WIDTH/2, BOARD_HEIGHT/2 - 35);
+        ctx.fillText('もっと効率よく落とそう', BOARD_WIDTH/2, BOARD_HEIGHT/2 - 15);
+    } else {
+        ctx.fillText(failedBlockNumber + 'を落とした！', BOARD_WIDTH/2, BOARD_HEIGHT/2 - 35);
+        ctx.fillText(nextNumber + 'が必要だった', BOARD_WIDTH/2, BOARD_HEIGHT/2 - 15);
+    }
 
     // ボタン
     var btnWidth = 120;
