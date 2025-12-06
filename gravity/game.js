@@ -1,9 +1,95 @@
-// Gravity Puzzle v1.0
+// Gravity Puzzle v1.2
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const startButton = document.getElementById('startButton');
 const debugInfo = document.getElementById('debugInfo');
 const scoreDisplay = document.getElementById('score');
+
+// Audio context
+let audioCtx = null;
+let bgmGain = null;
+let bgmPlaying = false;
+
+function initAudio() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    bgmGain = audioCtx.createGain();
+    bgmGain.gain.value = 0.3;
+    bgmGain.connect(audioCtx.destination);
+}
+
+// Play a simple tone
+function playTone(freq, duration, type = 'sine', volume = 0.3) {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.value = volume;
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+}
+
+// Sound effects
+function playMatchSound(chainCount) {
+    if (!audioCtx) return;
+    // Higher pitch for longer chains
+    const baseFreq = 440 + (chainCount - 1) * 100;
+    playTone(baseFreq, 0.15, 'sine', 0.4);
+    setTimeout(() => playTone(baseFreq * 1.25, 0.15, 'sine', 0.3), 50);
+    setTimeout(() => playTone(baseFreq * 1.5, 0.2, 'sine', 0.2), 100);
+}
+
+function playGravityChangeSound() {
+    if (!audioCtx) return;
+    playTone(220, 0.08, 'square', 0.15);
+    setTimeout(() => playTone(330, 0.08, 'square', 0.12), 40);
+}
+
+function playGameOverSound() {
+    if (!audioCtx) return;
+    playTone(440, 0.3, 'sawtooth', 0.3);
+    setTimeout(() => playTone(330, 0.3, 'sawtooth', 0.25), 200);
+    setTimeout(() => playTone(220, 0.5, 'sawtooth', 0.2), 400);
+}
+
+function playSpawnSound() {
+    if (!audioCtx) return;
+    playTone(880, 0.05, 'sine', 0.1);
+}
+
+// BGM using simple oscillators
+let bgmInterval = null;
+const bgmNotes = [
+    262, 294, 330, 349, 392, 440, 494, 523, // C major scale
+    523, 494, 440, 392, 349, 330, 294, 262  // descending
+];
+let bgmNoteIndex = 0;
+
+function startBGM() {
+    if (!audioCtx || bgmPlaying) return;
+    bgmPlaying = true;
+    bgmNoteIndex = 0;
+
+    bgmInterval = setInterval(() => {
+        if (!gamePaused && gameStarted && !gameOver) {
+            const note = bgmNotes[bgmNoteIndex % bgmNotes.length];
+            playTone(note, 0.4, 'sine', 0.08);
+            bgmNoteIndex++;
+        }
+    }, 500);
+}
+
+function stopBGM() {
+    if (bgmInterval) {
+        clearInterval(bgmInterval);
+        bgmInterval = null;
+    }
+    bgmPlaying = false;
+}
 
 // Game constants
 const COLS = 6;
@@ -158,10 +244,10 @@ function updateGravityFromTilt() {
     // beta (tiltX): 前後の傾き。スマホを普通に持つと約45-60度
     // gamma (tiltY): 左右の傾き。-90〜90度
 
-    // 基準角度を75度に（スマホをやや立てて持つ想定）
-    const baseAngle = 75;
-    const threshold = 20;
-    const upThreshold = 35; // 上方向は更に傾けないと反応しない
+    // 基準角度（ニュートラル位置）
+    const baseAngle = 50;
+    const threshold = 25;       // 左右・下の閾値
+    const upThreshold = 40;     // 上方向は更に傾けないと反応しない
 
     // 前後の傾きを基準角度からの差分として計算
     const forwardBack = tiltX - baseAngle;
@@ -170,8 +256,8 @@ function updateGravityFromTilt() {
 
     let newGravity = { ...gravity };
 
-    // 左右の傾きが大きい場合
-    if (Math.abs(leftRight) > threshold && Math.abs(leftRight) > Math.abs(forwardBack)) {
+    // 左右を優先判定（閾値を超えていれば）
+    if (Math.abs(leftRight) > threshold) {
         if (leftRight > 0) {
             newGravity = { x: 1, y: 0 }; // 右
         } else {
@@ -286,6 +372,9 @@ function findAndRemoveMatches() {
         const points = toRemove.size * 10 * chainBonus;
         score += points;
         scoreDisplay.textContent = `Score: ${score}`;
+
+        // Play match sound
+        playMatchSound(chainCount);
 
         if (chainCount > 1) {
             debugInfo.innerHTML = `${chainCount}連鎖! +${points}`;
@@ -404,6 +493,8 @@ async function processChains() {
     // Check game over
     if (checkGameOver()) {
         gameOver = true;
+        stopBGM();
+        playGameOverSound();
     }
 
     chainCount = 0;
@@ -481,7 +572,7 @@ function draw() {
         // Version number
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
         ctx.font = '12px Arial';
-        ctx.fillText('v1.0', BOARD_WIDTH/2, BOARD_HEIGHT/2 + 130);
+        ctx.fillText('v1.2', BOARD_WIDTH/2, BOARD_HEIGHT/2 + 130);
 
         ctx.fillStyle = '#fff';
         ctx.font = '14px Arial';
@@ -534,6 +625,7 @@ function setGravity(newGravity) {
     if (newGravity.x === gravity.x && newGravity.y === gravity.y) return;
 
     gravity = newGravity;
+    playGravityChangeSound();
     processChains();
 }
 
@@ -550,14 +642,17 @@ document.addEventListener('keydown', (e) => {
     // Enter to start/restart
     if (e.key === 'Enter') {
         if (!gameStarted) {
+            initAudio();
             initBoard();
             gameStarted = true;
             gameRunning = true;
             lastBlockSpawn = performance.now();
+            startBGM();
         } else if (gameOver) {
             initBoard();
             gameOver = false;
             lastBlockSpawn = performance.now();
+            startBGM();
         }
         return;
     }
@@ -584,16 +679,19 @@ document.addEventListener('keydown', (e) => {
 canvas.addEventListener('click', async (e) => {
     if (!gameStarted) {
         // Start game
+        initAudio();
         await requestOrientationPermission();
         initBoard();
         gameStarted = true;
         gameRunning = true;
         lastBlockSpawn = performance.now(); // Reset spawn timer
+        startBGM();
     } else if (gameOver) {
         // Restart
         initBoard();
         gameOver = false;
         lastBlockSpawn = performance.now(); // Reset spawn timer
+        startBGM();
     } else if (gamePaused) {
         // Resume
         gamePaused = false;
@@ -662,6 +760,7 @@ function gameLoop(timestamp) {
             const oldGravity = { ...gravity };
             updateGravityFromTilt();
             if (oldGravity.x !== gravity.x || oldGravity.y !== gravity.y) {
+                playGravityChangeSound();
                 processChains();
             }
         }
@@ -690,6 +789,7 @@ async function spawnNewBlock() {
 
     const added = addNewBlocks(1);
     if (added.length > 0) {
+        playSpawnSound();
         // Process gravity for the new block
         isProcessing = true;
         while (applyGravity()) {
@@ -708,6 +808,8 @@ async function spawnNewBlock() {
         // Check game over
         if (checkGameOver()) {
             gameOver = true;
+            stopBGM();
+            playGameOverSound();
         }
     }
 }
