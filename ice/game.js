@@ -1,7 +1,8 @@
-// 氷の世界 v1.9
+// 氷の世界 v2.0
 // スマホ専用スライディングパズル
 // 逆算式パズル自動生成
 // Retina対応
+// Par表示と星評価システム
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -173,6 +174,7 @@ let holePos = { row: 0, col: COLS - 1 };
 let nextNumber = 1;
 let moves = 0;
 let stage = 1;
+let parMoves = 0;        // 目安となる手数（シャッフル回数ベース）
 let gameStarted = false;
 let gameCleared = false;
 let gameFailed = false;
@@ -183,6 +185,10 @@ let isAnimating = false;
 // Selected block
 let selectedBlock = null;
 let animatingBlocks = [];
+
+// ステージ開始メッセージ表示用
+let showingStageMessage = false;
+let stageMessageTimer = null;
 
 // ========================================
 // 逆算式パズル自動生成システム
@@ -427,7 +433,8 @@ function generatePuzzle(stageNum) {
         obstacles: obstacles,
         hole: { row: holeRow, col: holeCol },
         rows: rows,
-        cols: cols
+        cols: cols,
+        par: numBlocks + Math.floor(shuffleMoves / 3)  // Par = ブロック数 + シャッフル/3
     };
 }
 
@@ -446,6 +453,7 @@ function initStage(stageNum) {
     }
 
     holePos = { ...puzzle.hole };
+    parMoves = puzzle.par;  // Par設定
 
     // Place numbered blocks
     puzzle.blocks.forEach(b => {
@@ -467,11 +475,32 @@ function initStage(stageNum) {
     isAnimating = false;
 
     updateDisplay();
+
+    // ステージ開始メッセージを表示
+    showStageMessage();
+}
+
+// ステージ開始メッセージを表示
+function showStageMessage() {
+    showingStageMessage = true;
+    if (stageMessageTimer) {
+        clearTimeout(stageMessageTimer);
+    }
+    stageMessageTimer = setTimeout(() => {
+        showingStageMessage = false;
+        stageMessageTimer = null;
+    }, 2500);  // 2.5秒間表示
 }
 
 function updateDisplay() {
-    const config = getStageConfig(stage);
-    scoreDisplay.textContent = `Stage ${stage} (${COLS}x${ROWS}) | Moves: ${moves}`;
+    scoreDisplay.textContent = `Stage ${stage} | Moves: ${moves} / Par ${parMoves}`;
+}
+
+// 星評価を計算
+function getStarRating() {
+    if (moves <= parMoves) return 3;       // Par以下で★3
+    if (moves <= parMoves + 3) return 2;   // Par+3以下で★2
+    return 1;                               // それ以上で★1
 }
 
 // Check if position is the hole
@@ -850,6 +879,8 @@ function draw() {
         drawClearScreen();
     } else if (gamePaused) {
         drawPauseScreen();
+    } else if (showingStageMessage) {
+        drawStageMessage();
     }
 }
 
@@ -961,7 +992,7 @@ function drawTitleScreen() {
 
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.font = '10px Arial';
-    ctx.fillText('v1.9', BOARD_WIDTH/2, BOARD_HEIGHT - 12);
+    ctx.fillText('v2.0', BOARD_WIDTH/2, BOARD_HEIGHT - 12);
 }
 
 function drawClearScreen() {
@@ -971,16 +1002,40 @@ function drawClearScreen() {
     ctx.fillStyle = '#4ecdc4';
     ctx.font = 'bold 32px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText('CLEAR!', BOARD_WIDTH/2, BOARD_HEIGHT/2 - 40);
+    ctx.fillText('CLEAR!', BOARD_WIDTH/2, BOARD_HEIGHT/2 - 70);
 
+    // 星評価を表示
+    const stars = getStarRating();
+    ctx.font = '36px Arial';
+    let starStr = '';
+    for (let i = 0; i < 3; i++) {
+        starStr += i < stars ? '★' : '☆';
+    }
+    ctx.fillStyle = '#ffe66d';
+    ctx.fillText(starStr, BOARD_WIDTH/2, BOARD_HEIGHT/2 - 25);
+
+    // 手数とPar
     ctx.fillStyle = '#fff';
-    ctx.font = '18px Arial';
-    ctx.fillText('Stage ' + stage, BOARD_WIDTH/2, BOARD_HEIGHT/2);
-    ctx.fillText(moves + ' moves', BOARD_WIDTH/2, BOARD_HEIGHT/2 + 25);
+    ctx.font = '16px Arial';
+    ctx.fillText('Stage ' + stage, BOARD_WIDTH/2, BOARD_HEIGHT/2 + 10);
+
+    const parDiff = moves - parMoves;
+    let parText = moves + ' moves';
+    if (parDiff === 0) {
+        parText += ' (Par)';
+        ctx.fillStyle = '#4ecdc4';
+    } else if (parDiff < 0) {
+        parText += ' (' + parDiff + ')';
+        ctx.fillStyle = '#ffe66d';
+    } else {
+        parText += ' (+' + parDiff + ')';
+        ctx.fillStyle = '#ff6b6b';
+    }
+    ctx.fillText(parText, BOARD_WIDTH/2, BOARD_HEIGHT/2 + 35);
 
     ctx.fillStyle = '#ffe66d';
     ctx.font = 'bold 16px Arial';
-    ctx.fillText('TAP FOR NEXT STAGE', BOARD_WIDTH/2, BOARD_HEIGHT/2 + 70);
+    ctx.fillText('TAP FOR NEXT STAGE', BOARD_WIDTH/2, BOARD_HEIGHT/2 + 80);
 }
 
 function drawFailScreen() {
@@ -1046,6 +1101,28 @@ function drawPauseScreen() {
     ctx.fillStyle = '#ffe66d';
     ctx.font = '16px Arial';
     ctx.fillText('TAP TO RESUME', BOARD_WIDTH/2, BOARD_HEIGHT/2 + 40);
+}
+
+// ステージ開始メッセージを描画
+function drawStageMessage() {
+    // 半透明の背景バナー
+    const bannerHeight = 80;
+    const bannerY = BOARD_HEIGHT / 2 - bannerHeight / 2;
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+    ctx.fillRect(0, bannerY, BOARD_WIDTH, bannerHeight);
+
+    // ステージ番号
+    ctx.fillStyle = '#4ecdc4';
+    ctx.font = 'bold 20px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Stage ' + stage, BOARD_WIDTH / 2, bannerY + 28);
+
+    // Par目標メッセージ
+    ctx.fillStyle = '#ffe66d';
+    ctx.font = '14px Arial';
+    const config = getStageConfig(stage);
+    ctx.fillText(parMoves + '手で順にブロックを全て落とそう', BOARD_WIDTH / 2, bannerY + 55);
 }
 
 // Touch controls - Safari compatible
