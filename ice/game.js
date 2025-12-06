@@ -1,4 +1,4 @@
-// 氷の世界 v1.2
+// 氷の世界 v1.3
 // スマホ専用スライディングパズル
 
 const canvas = document.getElementById('gameCanvas');
@@ -360,123 +360,117 @@ function calculateSingleSlide(startRow, startCol, direction) {
 async function executeSlide(row, col, direction) {
     if (isAnimating) return;
 
-    const block = board[row][col];
+    var block = board[row][col];
     if (!block || block.isObstacle) return;
 
-    const dr = direction.row;
-    const dc = direction.col;
+    var dr = direction.row;
+    var dc = direction.col;
 
-    // Check what's in the way
-    const nextRow = row + dr;
-    const nextCol = col + dc;
+    // まず、このブロックが動けるか確認
+    // 一時的にボードから除去して計算
+    board[row][col] = null;
+    var mySlideResult = calculateSingleSlide(row, col, direction);
+    board[row][col] = block;
 
-    // Check bounds first
-    if (nextRow < 0 || nextRow >= ROWS || nextCol < 0 || nextCol >= COLS) {
+    // 隣にブロックがあるかチェック
+    var adjacentRow = row + dr;
+    var adjacentCol = col + dc;
+    var adjacentBlock = getBlock(adjacentRow, adjacentCol);
+
+    // 隣が障害物なら動けない
+    if (adjacentBlock && adjacentBlock.isObstacle) {
         playErrorSound();
         return;
     }
 
-    // Check if blocked by obstacle immediately
-    const nextBlock = getBlock(nextRow, nextCol);
-    if (nextBlock && nextBlock.isObstacle) {
-        playErrorSound();
-        return;
-    }
-
-    isAnimating = true;
-
-    // If there's a pushable block, we need to push it first
-    if (nextBlock && !nextBlock.isObstacle) {
-        // Calculate where the pushed block will end up
-        // Remove BOTH blocks temporarily to calculate where pushed block slides to
+    // 隣にブロックがある場合、押し出し処理
+    if (adjacentBlock && !adjacentBlock.isObstacle) {
+        // 押されるブロックが動ける場所を計算
+        // 両方のブロックを一時的に除去
         board[row][col] = null;
-        board[nextRow][nextCol] = null;
+        board[adjacentRow][adjacentCol] = null;
 
-        // Calculate from the pushed block's NEXT position (one step in direction)
-        var pushStartRow = nextRow + dr;
-        var pushStartCol = nextCol + dc;
+        var pushSlideResult = calculateSingleSlide(adjacentRow, adjacentCol, direction);
 
-        // Check if that next position is valid
-        if (pushStartRow < 0 || pushStartRow >= ROWS || pushStartCol < 0 || pushStartCol >= COLS) {
-            // Would go out of bounds immediately
+        // 押されるブロックが動けない場合（同じ位置のまま）
+        if (pushSlideResult.row === adjacentRow && pushSlideResult.col === adjacentCol) {
+            // 動けない - 元に戻す
             board[row][col] = block;
-            board[nextRow][nextCol] = nextBlock;
+            board[adjacentRow][adjacentCol] = adjacentBlock;
             playErrorSound();
-            isAnimating = false;
             return;
         }
 
-        // Check if next position is hole
-        var pushResult;
-        if (isHole(pushStartRow, pushStartCol)) {
-            pushResult = { row: pushStartRow, col: pushStartCol, fellInHole: true };
-        } else if (board[pushStartRow][pushStartCol]) {
-            // Blocked by another block/obstacle immediately
-            board[row][col] = block;
-            board[nextRow][nextCol] = nextBlock;
-            playErrorSound();
-            isAnimating = false;
-            return;
-        } else {
-            // Calculate slide from the new position
-            pushResult = calculateSingleSlide(pushStartRow, pushStartCol, direction);
-        }
-
-        // Restore original block (pushed block stays removed for animation)
-        board[row][col] = block;
-
-        // pushResult is already set above, no need to check again
-
+        // 押し出し実行
+        isAnimating = true;
         playPushSound();
 
-        // Animate pushed block sliding to wall
-        nextBlock.animating = true;
-        nextBlock.startX = nextCol * CELL_SIZE;
-        nextBlock.startY = nextRow * CELL_SIZE;
-        nextBlock.targetX = pushResult.col * CELL_SIZE;
-        nextBlock.targetY = pushResult.row * CELL_SIZE;
-        nextBlock.progress = 0;
+        // 押されるブロックのアニメーション
+        adjacentBlock.animating = true;
+        adjacentBlock.startX = adjacentCol * CELL_SIZE;
+        adjacentBlock.startY = adjacentRow * CELL_SIZE;
+        adjacentBlock.targetX = pushSlideResult.col * CELL_SIZE;
+        adjacentBlock.targetY = pushSlideResult.row * CELL_SIZE;
+        adjacentBlock.progress = 0;
 
         animatingBlocks.push({
-            block: nextBlock,
-            finalRow: pushResult.row,
-            finalCol: pushResult.col,
-            fellInHole: pushResult.fellInHole
+            block: adjacentBlock,
+            finalRow: pushSlideResult.row,
+            finalCol: pushSlideResult.col,
+            fellInHole: pushSlideResult.fellInHole
         });
+
+        // 押すブロックを元に戻す（まだ動かしていない）
+        board[row][col] = block;
 
         await animateSlide();
 
-        // Handle pushed block landing
-        if (pushResult.fellInHole) {
-            if (nextBlock.number === nextNumber) {
+        // 押されたブロックの着地処理
+        if (pushSlideResult.fellInHole) {
+            if (adjacentBlock.number === nextNumber) {
                 playDropSound();
                 nextNumber++;
             } else {
                 playErrorSound();
-                debugInfo.textContent = nextBlock.number + 'を落とした！' + nextNumber + 'が必要';
+                debugInfo.textContent = adjacentBlock.number + 'を落とした！' + nextNumber + 'が必要';
                 setTimeout(function() { initStage(stage); }, 1500);
                 isAnimating = false;
                 return;
             }
         } else {
-            nextBlock.animating = false;
-            board[pushResult.row][pushResult.col] = nextBlock;
+            adjacentBlock.animating = false;
+            board[pushSlideResult.row][pushSlideResult.col] = adjacentBlock;
         }
+
+        // ステージクリア確認
+        if (checkStageClear()) {
+            gameCleared = true;
+            playClearSound();
+            isAnimating = false;
+            return;
+        }
+    } else {
+        // 隣にブロックがない場合、普通に動けるか確認
+        if (mySlideResult.row === row && mySlideResult.col === col) {
+            playErrorSound();
+            return;
+        }
+        isAnimating = true;
     }
 
-    // Now slide the original block (recalculate since board state changed)
+    // 押すブロック自身を滑らせる
     playSlideSound();
 
-    const slideResult = calculateSingleSlide(row, col, direction);
+    // 再計算（押し出し後にボード状態が変わっているため）
+    board[row][col] = null;
+    var slideResult = calculateSingleSlide(row, col, direction);
 
     if (slideResult.row === row && slideResult.col === col) {
-        // Didn't move at all
+        // 動けなかった
+        board[row][col] = block;
         isAnimating = false;
         return;
     }
-
-    // Remove from original position
-    board[row][col] = null;
 
     // Animate
     block.animating = true;
@@ -761,7 +755,7 @@ function drawTitleScreen() {
 
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.font = '10px Arial';
-    ctx.fillText('v1.2', BOARD_WIDTH/2, BOARD_HEIGHT - 12);
+    ctx.fillText('v1.3', BOARD_WIDTH/2, BOARD_HEIGHT - 12);
 }
 
 function drawClearScreen() {
