@@ -132,9 +132,15 @@ async function requestOrientationPermission() {
 }
 
 // Handle device orientation
+let hasRealOrientationData = false;
+
 function handleOrientation(event) {
-    tiltX = event.beta || 0;
-    tiltY = event.gamma || 0;
+    // Check if we're getting real orientation data (not just zeros)
+    if (event.beta !== null && event.gamma !== null) {
+        hasRealOrientationData = true;
+        tiltX = event.beta;
+        tiltY = event.gamma;
+    }
 }
 
 function getGravityDirection() {
@@ -205,7 +211,11 @@ function applyGravity() {
                 }
 
                 if (newRow !== row || newCol !== col) {
-                    board[newRow][newCol] = board[row][col];
+                    const block = board[row][col];
+                    // Set animation offset from old position
+                    block.animX = (col - newCol) * CELL_SIZE;
+                    block.animY = (row - newRow) * CELL_SIZE;
+                    board[newRow][newCol] = block;
                     board[row][col] = null;
                     moved = true;
                 }
@@ -280,7 +290,7 @@ function findAndRemoveMatches() {
     return 0;
 }
 
-// Add new blocks from the opposite side of gravity
+// Add new blocks from the opposite side of gravity (with animation offset)
 function addNewBlocks(count) {
     const added = [];
 
@@ -289,19 +299,19 @@ function addNewBlocks(count) {
 
     if (gravity.y > 0) { // Gravity down, spawn from top
         for (let col = 0; col < COLS; col++) {
-            if (!board[0][col]) spawnPositions.push({row: 0, col});
+            if (!board[0][col]) spawnPositions.push({row: 0, col, offsetY: -CELL_SIZE * 2});
         }
     } else if (gravity.y < 0) { // Gravity up, spawn from bottom
         for (let col = 0; col < COLS; col++) {
-            if (!board[ROWS-1][col]) spawnPositions.push({row: ROWS-1, col});
+            if (!board[ROWS-1][col]) spawnPositions.push({row: ROWS-1, col, offsetY: CELL_SIZE * 2});
         }
     } else if (gravity.x > 0) { // Gravity right, spawn from left
         for (let row = 0; row < ROWS; row++) {
-            if (!board[row][0]) spawnPositions.push({row, col: 0});
+            if (!board[row][0]) spawnPositions.push({row, col: 0, offsetX: -CELL_SIZE * 2});
         }
     } else { // Gravity left, spawn from right
         for (let row = 0; row < ROWS; row++) {
-            if (!board[row][COLS-1]) spawnPositions.push({row, col: COLS-1});
+            if (!board[row][COLS-1]) spawnPositions.push({row, col: COLS-1, offsetX: CELL_SIZE * 2});
         }
     }
 
@@ -312,7 +322,10 @@ function addNewBlocks(count) {
     for (let i = 0; i < toAdd; i++) {
         const pos = spawnPositions[i];
         board[pos.row][pos.col] = {
-            color: getSafeColor(pos.row, pos.col)
+            color: getSafeColor(pos.row, pos.col),
+            // Animation offset - block will animate from this position
+            animX: pos.offsetX || 0,
+            animY: pos.offsetY || 0
         };
         added.push(pos);
     }
@@ -324,6 +337,7 @@ function addNewBlocks(count) {
 function countEmpty() {
     let count = 0;
     for (let row = 0; row < ROWS; row++) {
+        if (!board[row]) continue;
         for (let col = 0; col < COLS; col++) {
             if (!board[row][col]) count++;
         }
@@ -375,18 +389,6 @@ async function processChains() {
         await sleep(200);
     }
 
-    // Add new blocks if too few remain
-    const blockCount = countBlocks();
-    if (blockCount < ROWS * COLS * 0.4) {
-        const toAdd = Math.floor(Math.random() * 3) + 2;
-        addNewBlocks(toAdd);
-
-        // Apply gravity to new blocks
-        while (applyGravity()) {
-            await sleep(50);
-        }
-    }
-
     // Check game over
     if (checkGameOver()) {
         gameOver = true;
@@ -422,19 +424,24 @@ function draw() {
         ctx.stroke();
     }
 
-    // Draw blocks
+    // Draw blocks with animation
     for (let row = 0; row < ROWS; row++) {
+        if (!board[row]) continue; // Skip if row not initialized
         for (let col = 0; col < COLS; col++) {
             const block = board[row][col];
             if (block) {
+                // Animate offset towards 0
+                if (block.animX) block.animX *= 0.85;
+                if (block.animY) block.animY *= 0.85;
+                if (Math.abs(block.animX || 0) < 1) block.animX = 0;
+                if (Math.abs(block.animY || 0) < 1) block.animY = 0;
+
                 const padding = 3;
+                const x = col * CELL_SIZE + padding + (block.animX || 0);
+                const y = row * CELL_SIZE + padding + (block.animY || 0);
+
                 ctx.fillStyle = block.color;
-                ctx.fillRect(
-                    col * CELL_SIZE + padding,
-                    row * CELL_SIZE + padding,
-                    CELL_SIZE - padding * 2,
-                    CELL_SIZE - padding * 2
-                );
+                ctx.fillRect(x, y, CELL_SIZE - padding * 2, CELL_SIZE - padding * 2);
             }
         }
     }
@@ -529,9 +536,11 @@ document.addEventListener('keydown', (e) => {
             initBoard();
             gameStarted = true;
             gameRunning = true;
+            lastBlockSpawn = performance.now();
         } else if (gameOver) {
             initBoard();
             gameOver = false;
+            lastBlockSpawn = performance.now();
         }
         return;
     }
@@ -562,10 +571,12 @@ canvas.addEventListener('click', async (e) => {
         initBoard();
         gameStarted = true;
         gameRunning = true;
+        lastBlockSpawn = performance.now(); // Reset spawn timer
     } else if (gameOver) {
         // Restart
         initBoard();
         gameOver = false;
+        lastBlockSpawn = performance.now(); // Reset spawn timer
     } else if (gamePaused) {
         // Resume
         gamePaused = false;
@@ -622,11 +633,14 @@ canvas.addEventListener('touchend', (e) => {
 
 // Game loop
 let lastOrientationCheck = 0;
+let lastBlockSpawn = 0;
+const SPAWN_INTERVAL = 3000; // New block every 3 seconds
 
 function gameLoop(timestamp) {
     if (gameRunning && !gameOver && !gamePaused && gameStarted) {
         // Update gravity from device orientation (throttled)
-        if (orientationPermission && timestamp - lastOrientationCheck > 200) {
+        // Only if we have real orientation data (not PC with fake support)
+        if (orientationPermission && hasRealOrientationData && timestamp - lastOrientationCheck > 200) {
             lastOrientationCheck = timestamp;
             const oldGravity = { ...gravity };
             updateGravityFromTilt();
@@ -635,8 +649,14 @@ function gameLoop(timestamp) {
             }
         }
 
+        // Spawn new blocks periodically
+        if (!isProcessing && timestamp - lastBlockSpawn > SPAWN_INTERVAL) {
+            lastBlockSpawn = timestamp;
+            spawnNewBlock();
+        }
+
         // Update debug info
-        if (orientationPermission) {
+        if (orientationPermission && hasRealOrientationData) {
             debugInfo.innerHTML = `傾き β:${tiltX.toFixed(0)}° γ:${tiltY.toFixed(0)}°<br>ブロック: ${countBlocks()}`;
         } else {
             debugInfo.innerHTML = `矢印キー操作 / Space:ポーズ<br>ブロック: ${countBlocks()}`;
@@ -645,6 +665,34 @@ function gameLoop(timestamp) {
 
     draw();
     requestAnimationFrame(gameLoop);
+}
+
+// Spawn a new block and let it fall
+async function spawnNewBlock() {
+    if (isProcessing || gameOver) return;
+
+    const added = addNewBlocks(1);
+    if (added.length > 0) {
+        // Process gravity for the new block
+        isProcessing = true;
+        while (applyGravity()) {
+            await sleep(50);
+        }
+        // Check for matches
+        const removed = findAndRemoveMatches();
+        if (removed > 0) {
+            await sleep(200);
+            // Continue chain
+            await processChains();
+        } else {
+            isProcessing = false;
+        }
+
+        // Check game over
+        if (checkGameOver()) {
+            gameOver = true;
+        }
+    }
 }
 
 // Hide the HTML start button (we use canvas overlay instead)
