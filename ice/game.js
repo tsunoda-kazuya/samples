@@ -1,6 +1,6 @@
-// 氷の世界 v2.0
+// 氷の世界 v2.1
 // スマホ専用スライディングパズル
-// 逆算式パズル自動生成
+// BFSソルバーで最短解を保証
 // Retina対応
 // Par表示と星評価システム
 
@@ -192,9 +192,8 @@ let showingStageMessage = false;
 let stageMessageTimer = null;
 
 // ========================================
-// 逆算式パズル自動生成システム
-// ゴール状態から逆にシャッフルすることで
-// 必ず解のあるパズルを生成
+// パズル自動生成システム
+// BFSソルバーで最短解を保証
 // ========================================
 
 // ランダム整数
@@ -252,195 +251,311 @@ function simulateSlide(simBoard, rows, cols, holeRow, holeCol, blockRow, blockCo
     return { row, col, fellInHole: false };
 }
 
-// 逆スライド: ブロックを逆方向から引っ張ってくる
-function simulateReverseSlide(simBoard, rows, cols, holeRow, holeCol, blockRow, blockCol, dr, dc) {
-    // 逆方向からブロックが来れる位置を探す
-    const reverseDr = -dr;
-    const reverseDc = -dc;
+// ========================================
+// BFSソルバー: 最短手数を計算
+// ========================================
 
-    let startRow = blockRow + reverseDr;
-    let startCol = blockCol + reverseDc;
-
-    // 開始位置が有効か確認
-    if (startRow < 0 || startRow >= rows || startCol < 0 || startCol >= cols) {
-        return null;
-    }
-    if (simBoard[startRow][startCol] !== null) {
-        return null;
-    }
-    if (startRow === holeRow && startCol === holeCol) {
-        return null;
-    }
-
-    // さらに奥まで探索して、ランダムな開始位置を選ぶ
-    const candidates = [{ row: startRow, col: startCol }];
-    let r = startRow + reverseDr;
-    let c = startCol + reverseDc;
-
-    while (r >= 0 && r < rows && c >= 0 && c < cols) {
-        if (simBoard[r][c] !== null || (r === holeRow && c === holeCol)) {
-            break;
-        }
-        candidates.push({ row: r, col: c });
-        r += reverseDr;
-        c += reverseDc;
-    }
-
-    // ランダムに選ぶ（遠いほど難しい）
-    return candidates[randInt(0, candidates.length - 1)];
+// 状態をキーに変換（ブロック位置と次に落とすべき番号）
+function stateToKey(blocks, nextNum) {
+    // ブロックを番号順にソートして位置を文字列化
+    const sorted = [...blocks].sort((a, b) => a.number - b.number);
+    return sorted.map(b => `${b.number}:${b.row},${b.col}`).join('|') + `#${nextNum}`;
 }
 
-// パズル生成: 逆算方式
+// BFSで最短手数を求める
+function solvePuzzle(blocks, obstacles, hole, rows, cols) {
+    const directions = [
+        { dr: -1, dc: 0 }, { dr: 1, dc: 0 },
+        { dr: 0, dc: -1 }, { dr: 0, dc: 1 }
+    ];
+
+    // 初期状態
+    const initialBlocks = blocks.map(b => ({ ...b }));
+    const initialKey = stateToKey(initialBlocks, 1);
+
+    // BFSキュー: [blocks配列, 次に落とす番号, 手数]
+    const queue = [[initialBlocks, 1, 0]];
+    const visited = new Set([initialKey]);
+
+    // 障害物マップ
+    const obstacleMap = new Set();
+    obstacles.forEach(o => obstacleMap.add(`${o.row},${o.col}`));
+
+    const maxMoves = 50; // 探索上限
+
+    while (queue.length > 0) {
+        const [currentBlocks, nextNum, moveCount] = queue.shift();
+
+        // クリア判定: 全ブロックが落ちた
+        if (currentBlocks.length === 0) {
+            return moveCount;
+        }
+
+        // 探索上限
+        if (moveCount >= maxMoves) continue;
+
+        // 各ブロックを各方向に動かしてみる
+        for (let bi = 0; bi < currentBlocks.length; bi++) {
+            const block = currentBlocks[bi];
+
+            for (const dir of directions) {
+                // ボードを作成
+                const boardMap = new Map();
+                currentBlocks.forEach((b, idx) => {
+                    if (idx !== bi) {
+                        boardMap.set(`${b.row},${b.col}`, b);
+                    }
+                });
+
+                // 隣のマスをチェック
+                const adjRow = block.row + dir.dr;
+                const adjCol = block.col + dir.dc;
+
+                if (adjRow < 0 || adjRow >= rows || adjCol < 0 || adjCol >= cols) continue;
+                if (obstacleMap.has(`${adjRow},${adjCol}`)) continue;
+                if (boardMap.has(`${adjRow},${adjCol}`)) continue;
+
+                // スライド先を計算
+                let r = block.row;
+                let c = block.col;
+                let fellInHole = false;
+
+                while (true) {
+                    const nr = r + dir.dr;
+                    const nc = c + dir.dc;
+
+                    if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) break;
+                    if (nr === hole.row && nc === hole.col) {
+                        fellInHole = true;
+                        break;
+                    }
+                    if (obstacleMap.has(`${nr},${nc}`)) break;
+                    if (boardMap.has(`${nr},${nc}`)) break;
+
+                    r = nr;
+                    c = nc;
+                }
+
+                // 動けなかった
+                if (r === block.row && c === block.col && !fellInHole) continue;
+
+                // 新しい状態を作成
+                let newBlocks, newNextNum;
+
+                if (fellInHole) {
+                    // 正しい順番で落ちたか？
+                    if (block.number === nextNum) {
+                        newBlocks = currentBlocks.filter((_, idx) => idx !== bi);
+                        newNextNum = nextNum + 1;
+                    } else {
+                        // 順番違い = この経路は無効
+                        continue;
+                    }
+                } else {
+                    newBlocks = currentBlocks.map((b, idx) =>
+                        idx === bi ? { ...b, row: r, col: c } : { ...b }
+                    );
+                    newNextNum = nextNum;
+                }
+
+                const newKey = stateToKey(newBlocks, newNextNum);
+                if (!visited.has(newKey)) {
+                    visited.add(newKey);
+                    queue.push([newBlocks, newNextNum, moveCount + 1]);
+                }
+            }
+        }
+    }
+
+    // 解なし
+    return -1;
+}
+
+// パズル生成: ソルバー検証付き
 function generatePuzzle(stageNum) {
     const config = getStageConfig(stageNum);
     const rows = config.rows;
     const cols = config.cols;
     const numBlocks = config.blocks;
     const numObstacles = config.obstacles;
-    const shuffleMoves = config.shuffleMoves;
+    const targetMinMoves = config.shuffleMoves; // 目標の最短手数（難易度指標）
 
     // グローバル変数更新
     COLS = cols;
     ROWS = rows;
     resizeCanvas();
 
-    // ホールの位置（右上固定 or ランダム端）
-    const holePositions = [];
-    for (let c = 0; c < cols; c++) holePositions.push({ row: 0, col: c });
-    for (let c = 0; c < cols; c++) holePositions.push({ row: rows - 1, col: c });
-    for (let r = 1; r < rows - 1; r++) holePositions.push({ row: r, col: 0 });
-    for (let r = 1; r < rows - 1; r++) holePositions.push({ row: r, col: cols - 1 });
-
-    const holeIdx = randInt(0, holePositions.length - 1);
-    const holeRow = holePositions[holeIdx].row;
-    const holeCol = holePositions[holeIdx].col;
-
-    // シミュレーション用ボード作成
-    let simBoard = [];
-    for (let r = 0; r < rows; r++) {
-        simBoard[r] = [];
-        for (let c = 0; c < cols; c++) {
-            simBoard[r][c] = null;
-        }
-    }
-
-    // 障害物を配置（ホールから離れた位置に）
-    const obstacles = [];
-    let attempts = 0;
-    while (obstacles.length < numObstacles && attempts < 100) {
-        const r = randInt(1, rows - 2); // 端は避ける
-        const c = randInt(1, cols - 2);
-        if (simBoard[r][c] === null &&
-            !(r === holeRow && c === holeCol) &&
-            Math.abs(r - holeRow) + Math.abs(c - holeCol) > 2) {
-            simBoard[r][c] = { isObstacle: true };
-            obstacles.push({ row: r, col: c });
-        }
-        attempts++;
-    }
-
-    // ブロックを穴の隣に配置（ゴール状態）
-    // 1番から順に穴に入る順序で、穴に隣接するセルから逆算開始
     const directions = [
         { dr: -1, dc: 0 }, { dr: 1, dc: 0 },
         { dr: 0, dc: -1 }, { dr: 0, dc: 1 }
     ];
 
-    // 各ブロックの初期位置（穴に落とせる位置）を見つける
-    const blocks = [];
+    // 有効なパズルが生成されるまで繰り返す
+    for (let attempt = 0; attempt < 100; attempt++) {
+        // ホールの位置（ランダム端）
+        const holePositions = [];
+        for (let c = 0; c < cols; c++) holePositions.push({ row: 0, col: c });
+        for (let c = 0; c < cols; c++) holePositions.push({ row: rows - 1, col: c });
+        for (let r = 1; r < rows - 1; r++) holePositions.push({ row: r, col: 0 });
+        for (let r = 1; r < rows - 1; r++) holePositions.push({ row: r, col: cols - 1 });
 
-    for (let num = 1; num <= numBlocks; num++) {
-        // 穴に隣接する空きセルを探す
-        let placed = false;
-        const shuffledDirs = shuffleArray([...directions]);
+        const holeIdx = randInt(0, holePositions.length - 1);
+        const hole = { row: holePositions[holeIdx].row, col: holePositions[holeIdx].col };
 
-        for (const dir of shuffledDirs) {
-            const adjRow = holeRow - dir.dr;
-            const adjCol = holeCol - dir.dc;
-
-            if (adjRow >= 0 && adjRow < rows && adjCol >= 0 && adjCol < cols) {
-                if (simBoard[adjRow][adjCol] === null) {
-                    // この位置から穴にスライドできるか確認
-                    // → 穴の手前に配置して、そこから逆算でシャッフル
-                    simBoard[adjRow][adjCol] = { number: num };
-                    blocks.push({ row: adjRow, col: adjCol, number: num });
-                    placed = true;
-                    break;
-                }
+        // シミュレーション用ボード作成
+        let simBoard = [];
+        for (let r = 0; r < rows; r++) {
+            simBoard[r] = [];
+            for (let c = 0; c < cols; c++) {
+                simBoard[r][c] = null;
             }
         }
 
-        // 隣接位置が埋まっていたら、滑って穴に入れる位置を探す
-        if (!placed) {
-            for (const dir of shuffledDirs) {
-                let r = holeRow - dir.dr;
-                let c = holeCol - dir.dc;
+        // 障害物を配置
+        const obstacles = [];
+        let obsAttempts = 0;
+        while (obstacles.length < numObstacles && obsAttempts < 100) {
+            const r = randInt(1, rows - 2);
+            const c = randInt(1, cols - 2);
+            if (simBoard[r][c] === null &&
+                !(r === hole.row && c === hole.col) &&
+                Math.abs(r - hole.row) + Math.abs(c - hole.col) > 2) {
+                simBoard[r][c] = { isObstacle: true };
+                obstacles.push({ row: r, col: c });
+            }
+            obsAttempts++;
+        }
 
-                // 穴から逆方向に探索
-                while (r >= 0 && r < rows && c >= 0 && c < cols) {
-                    if (simBoard[r][c] === null) {
-                        simBoard[r][c] = { number: num };
-                        blocks.push({ row: r, col: c, number: num });
+        // ブロックを穴の近くに配置（ゴール状態から開始）
+        const blocks = [];
+        for (let num = 1; num <= numBlocks; num++) {
+            let placed = false;
+            const shuffledDirs = shuffleArray([...directions]);
+
+            // 穴に隣接する空きセルを探す
+            for (const dir of shuffledDirs) {
+                const adjRow = hole.row - dir.dr;
+                const adjCol = hole.col - dir.dc;
+
+                if (adjRow >= 0 && adjRow < rows && adjCol >= 0 && adjCol < cols) {
+                    if (simBoard[adjRow][adjCol] === null) {
+                        simBoard[adjRow][adjCol] = { number: num };
+                        blocks.push({ row: adjRow, col: adjCol, number: num });
                         placed = true;
                         break;
                     }
-                    r -= dir.dr;
-                    c -= dir.dc;
                 }
-                if (placed) break;
             }
-        }
 
-        if (!placed) {
-            // フォールバック: 空いてる場所に置く
-            for (let r = 0; r < rows && !placed; r++) {
-                for (let c = 0; c < cols && !placed; c++) {
-                    if (simBoard[r][c] === null && !(r === holeRow && c === holeCol)) {
-                        simBoard[r][c] = { number: num };
-                        blocks.push({ row: r, col: c, number: num });
-                        placed = true;
+            // 滑って穴に入れる位置を探す
+            if (!placed) {
+                for (const dir of shuffledDirs) {
+                    let r = hole.row - dir.dr;
+                    let c = hole.col - dir.dc;
+
+                    while (r >= 0 && r < rows && c >= 0 && c < cols) {
+                        if (simBoard[r][c] === null) {
+                            simBoard[r][c] = { number: num };
+                            blocks.push({ row: r, col: c, number: num });
+                            placed = true;
+                            break;
+                        }
+                        r -= dir.dr;
+                        c -= dir.dc;
+                    }
+                    if (placed) break;
+                }
+            }
+
+            // フォールバック
+            if (!placed) {
+                for (let r = 0; r < rows && !placed; r++) {
+                    for (let c = 0; c < cols && !placed; c++) {
+                        if (simBoard[r][c] === null && !(r === hole.row && c === hole.col)) {
+                            simBoard[r][c] = { number: num };
+                            blocks.push({ row: r, col: c, number: num });
+                            placed = true;
+                        }
                     }
                 }
             }
         }
-    }
 
-    // シャッフル: ブロックをランダムに逆スライド
-    for (let move = 0; move < shuffleMoves; move++) {
-        // ランダムなブロックを選ぶ
-        const blockIdx = randInt(0, blocks.length - 1);
-        const block = blocks[blockIdx];
+        // 逆シャッフル（ゴール状態から離す）
+        const shuffleCount = targetMinMoves * 3; // 多めにシャッフル
+        for (let move = 0; move < shuffleCount; move++) {
+            const blockIdx = randInt(0, blocks.length - 1);
+            const block = blocks[blockIdx];
+            const dir = directions[randInt(0, 3)];
 
-        // ランダムな方向を選ぶ
-        const dir = directions[randInt(0, 3)];
+            const newPos = simulateReverseSlide(
+                simBoard, rows, cols, hole.row, hole.col,
+                block.row, block.col, dir.dr, dir.dc
+            );
 
-        // 逆スライドを試みる
-        const newPos = simulateReverseSlide(
-            simBoard, rows, cols, holeRow, holeCol,
-            block.row, block.col, dir.dr, dir.dc
-        );
+            if (newPos) {
+                simBoard[block.row][block.col] = null;
+                simBoard[newPos.row][newPos.col] = { number: block.number };
+                block.row = newPos.row;
+                block.col = newPos.col;
+            }
+        }
 
-        if (newPos) {
-            // ボード更新
-            simBoard[block.row][block.col] = null;
-            simBoard[newPos.row][newPos.col] = { number: block.number };
-            block.row = newPos.row;
-            block.col = newPos.col;
+        // ソルバーで最短手数を計算
+        const blocksCopy = blocks.map(b => ({ row: b.row, col: b.col, number: b.number }));
+        const minMoves = solvePuzzle(blocksCopy, obstacles, hole, rows, cols);
+
+        // 解があり、適切な難易度の場合採用
+        if (minMoves > 0 && minMoves >= numBlocks) {
+            // Par = 最短手数 + 1〜2手のバッファ
+            const buffer = Math.min(2, Math.max(1, Math.floor(minMoves / 5)));
+            const par = minMoves + buffer;
+
+            return {
+                blocks: blocks.map(b => ({ row: b.row, col: b.col, number: b.number })),
+                obstacles: obstacles,
+                hole: hole,
+                rows: rows,
+                cols: cols,
+                par: par,
+                minMoves: minMoves
+            };
         }
     }
 
-    // Par計算: ブロック数 + 固定バッファ（2〜3手）
-    // 面が進んでも難易度が均一になるよう固定値
-    const buffer = Math.min(3, Math.max(2, Math.floor(numBlocks / 3)));
-    const basePar = numBlocks + buffer;
+    // フォールバック: 単純なパズルを返す
+    console.warn('Could not generate optimal puzzle, using fallback');
+    return generateSimplePuzzle(stageNum);
+}
+
+// フォールバック用シンプルパズル
+function generateSimplePuzzle(stageNum) {
+    const config = getStageConfig(stageNum);
+    const rows = config.rows;
+    const cols = config.cols;
+    const numBlocks = config.blocks;
+
+    COLS = cols;
+    ROWS = rows;
+    resizeCanvas();
+
+    const hole = { row: 0, col: cols - 1 };
+    const blocks = [];
+    const obstacles = [];
+
+    // ブロックを穴の下に縦に配置
+    for (let i = 0; i < numBlocks; i++) {
+        blocks.push({ row: i + 1, col: cols - 1, number: i + 1 });
+    }
 
     return {
-        blocks: blocks.map(b => ({ row: b.row, col: b.col, number: b.number })),
+        blocks: blocks,
         obstacles: obstacles,
-        hole: { row: holeRow, col: holeCol },
+        hole: hole,
         rows: rows,
         cols: cols,
-        par: basePar
+        par: numBlocks + 2,
+        minMoves: numBlocks
     };
 }
 
@@ -1008,7 +1123,7 @@ function drawTitleScreen() {
 
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.font = '10px Arial';
-    ctx.fillText('v2.0', BOARD_WIDTH/2, BOARD_HEIGHT - 12);
+    ctx.fillText('v2.1', BOARD_WIDTH/2, BOARD_HEIGHT - 12);
 }
 
 function drawClearScreen() {
