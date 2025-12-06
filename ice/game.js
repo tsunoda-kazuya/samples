@@ -1,4 +1,4 @@
-// 氷の世界 v1.4
+// 氷の世界 v1.6
 // スマホ専用スライディングパズル
 
 const canvas = document.getElementById('gameCanvas');
@@ -67,6 +67,12 @@ function playClearSound() {
 
 function playErrorSound() {
     playTone(200, 0.15, 'sawtooth', 0.1);
+}
+
+function playFailSound() {
+    // ぶぶー音
+    playTone(150, 0.3, 'sawtooth', 0.2);
+    setTimeout(function() { playTone(100, 0.4, 'sawtooth', 0.2); }, 200);
 }
 
 // BGM
@@ -143,6 +149,8 @@ let moves = 0;
 let stage = 1;
 let gameStarted = false;
 let gameCleared = false;
+let gameFailed = false;
+let failedBlockNumber = 0;
 let gamePaused = false;
 let isAnimating = false;
 
@@ -252,6 +260,8 @@ function initStage(stageNum) {
     nextNumber = 1;
     moves = 0;
     gameCleared = false;
+    gameFailed = false;
+    failedBlockNumber = 0;
     selectedBlock = null;
     animatingBlocks = [];
     isAnimating = false;
@@ -397,48 +407,31 @@ async function executeSlide(row, col, direction) {
     playSlideSound();
 
     // 滑った先にブロックがあるかチェック（押し出し判定）
-    // slideResultは停止位置。その先にブロックがあれば押し出す
     var stopRow = slideResult.row;
     var stopCol = slideResult.col;
     var beyondRow = stopRow + dr;
     var beyondCol = stopCol + dc;
     var hitBlock = getBlock(beyondRow, beyondCol);
     var pushResult = null;
-
-    // 滑った距離が1マス以上で、停止理由がブロックの場合のみ押し出し
     var distanceMoved = Math.abs(stopRow - row) + Math.abs(stopCol - col);
+    var willPush = distanceMoved >= 1 && hitBlock && !hitBlock.isObstacle && !slideResult.fellInHole;
 
-    if (distanceMoved >= 1 && hitBlock && !hitBlock.isObstacle && !slideResult.fellInHole) {
-        // 押し出し処理：hitBlockを押し出す
+    // 押し出し可能かを事前計算
+    if (willPush) {
         board[beyondRow][beyondCol] = null;
         pushResult = calculateSingleSlide(beyondRow, beyondCol, direction);
-
-        if (pushResult.row !== beyondRow || pushResult.col !== beyondCol) {
-            // 押し出せる
-            playPushSound();
-
-            hitBlock.animating = true;
-            hitBlock.startX = beyondCol * CELL_SIZE;
-            hitBlock.startY = beyondRow * CELL_SIZE;
-            hitBlock.targetX = pushResult.col * CELL_SIZE;
-            hitBlock.targetY = pushResult.row * CELL_SIZE;
-            hitBlock.progress = 0;
-
-            animatingBlocks.push({
-                block: hitBlock,
-                finalRow: pushResult.row,
-                finalCol: pushResult.col,
-                fellInHole: pushResult.fellInHole
-            });
-        } else {
+        if (pushResult.row === beyondRow && pushResult.col === beyondCol) {
             // 押し出せない - 元に戻す
+            board[beyondRow][beyondCol] = hitBlock;
+            willPush = false;
+            pushResult = null;
+        } else {
+            // 押し出せる - 一旦戻す（アニメーション後に処理）
             board[beyondRow][beyondCol] = hitBlock;
         }
     }
 
-    // メインブロックのアニメーション
-
-    // Animate
+    // 1. メインブロックのアニメーション（先に動く）
     block.animating = true;
     block.startX = col * CELL_SIZE;
     block.startY = row * CELL_SIZE;
@@ -447,7 +440,7 @@ async function executeSlide(row, col, direction) {
     block.progress = 0;
 
     animatingBlocks.push({
-        block,
+        block: block,
         finalRow: slideResult.row,
         finalCol: slideResult.col,
         fellInHole: slideResult.fellInHole
@@ -455,19 +448,59 @@ async function executeSlide(row, col, direction) {
 
     await animateSlide();
 
+    // メインブロックの着地処理
+    if (slideResult.fellInHole) {
+        if (block.number === nextNumber) {
+            playDropSound();
+            nextNumber++;
+        } else {
+            // 失敗！
+            playFailSound();
+            failedBlockNumber = block.number;
+            gameFailed = true;
+            isAnimating = false;
+            return;
+        }
+    } else {
+        block.animating = false;
+        board[slideResult.row][slideResult.col] = block;
+    }
+
     moves++;
     updateDisplay();
 
-    // 押し出されたブロックの着地処理
-    if (pushResult && hitBlock && !hitBlock.isObstacle && (pushResult.row !== beyondRow || pushResult.col !== beyondCol)) {
+    // 2. 押し出しブロックのアニメーション（当たってから動く）
+    if (willPush && pushResult) {
+        playPushSound();
+
+        board[beyondRow][beyondCol] = null;
+
+        hitBlock.animating = true;
+        hitBlock.startX = beyondCol * CELL_SIZE;
+        hitBlock.startY = beyondRow * CELL_SIZE;
+        hitBlock.targetX = pushResult.col * CELL_SIZE;
+        hitBlock.targetY = pushResult.row * CELL_SIZE;
+        hitBlock.progress = 0;
+
+        animatingBlocks.push({
+            block: hitBlock,
+            finalRow: pushResult.row,
+            finalCol: pushResult.col,
+            fellInHole: pushResult.fellInHole
+        });
+
+        await animateSlide();
+
+        // 押し出されたブロックの着地処理
         if (pushResult.fellInHole) {
             if (hitBlock.number === nextNumber) {
                 playDropSound();
                 nextNumber++;
             } else {
-                playErrorSound();
-                debugInfo.textContent = hitBlock.number + 'を落とした！' + nextNumber + 'が必要';
-                setTimeout(function() { initStage(stage); }, 1500);
+                // 失敗！
+                playFailSound();
+                failedBlockNumber = hitBlock.number;
+                gameFailed = true;
                 isAnimating = false;
                 return;
             }
@@ -475,23 +508,6 @@ async function executeSlide(row, col, direction) {
             hitBlock.animating = false;
             board[pushResult.row][pushResult.col] = hitBlock;
         }
-    }
-
-    // メインブロックの着地処理
-    if (slideResult.fellInHole) {
-        if (block.number === nextNumber) {
-            playDropSound();
-            nextNumber++;
-        } else {
-            playErrorSound();
-            debugInfo.textContent = block.number + 'を落とした！' + nextNumber + 'が必要';
-            setTimeout(function() { initStage(stage); }, 1500);
-            isAnimating = false;
-            return;
-        }
-    } else {
-        block.animating = false;
-        board[slideResult.row][slideResult.col] = block;
     }
 
     // クリア確認
@@ -627,6 +643,8 @@ function draw() {
     // Draw overlays
     if (!gameStarted) {
         drawTitleScreen();
+    } else if (gameFailed) {
+        drawFailScreen();
     } else if (gameCleared) {
         drawClearScreen();
     } else if (gamePaused) {
@@ -735,7 +753,7 @@ function drawTitleScreen() {
 
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.font = '10px Arial';
-    ctx.fillText('v1.4', BOARD_WIDTH/2, BOARD_HEIGHT - 12);
+    ctx.fillText('v1.6', BOARD_WIDTH/2, BOARD_HEIGHT - 12);
 }
 
 function drawClearScreen() {
@@ -755,6 +773,57 @@ function drawClearScreen() {
     ctx.fillStyle = '#ffe66d';
     ctx.font = 'bold 16px Arial';
     ctx.fillText('TAP FOR NEXT STAGE', BOARD_WIDTH/2, BOARD_HEIGHT/2 + 70);
+}
+
+function drawFailScreen() {
+    ctx.fillStyle = 'rgba(0,0,0,0.85)';
+    ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
+
+    // 失敗タイトル
+    ctx.fillStyle = '#ff6b6b';
+    ctx.font = 'bold 32px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('FAILED!', BOARD_WIDTH/2, BOARD_HEIGHT/2 - 70);
+
+    // 説明
+    ctx.fillStyle = '#fff';
+    ctx.font = '14px Arial';
+    ctx.fillText(failedBlockNumber + 'を落とした！', BOARD_WIDTH/2, BOARD_HEIGHT/2 - 35);
+    ctx.fillText(nextNumber + 'が必要だった', BOARD_WIDTH/2, BOARD_HEIGHT/2 - 15);
+
+    // ボタン
+    var btnWidth = 120;
+    var btnHeight = 45;
+    var btnY = BOARD_HEIGHT/2 + 30;
+    var retryX = BOARD_WIDTH/2 - btnWidth - 10;
+    var restartX = BOARD_WIDTH/2 + 10;
+
+    // Retryボタン
+    ctx.fillStyle = '#4ecdc4';
+    ctx.fillRect(retryX, btnY, btnWidth, btnHeight);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText('RETRY', retryX + btnWidth/2, btnY + btnHeight/2 + 6);
+
+    // Restartボタン
+    ctx.fillStyle = '#a29bfe';
+    ctx.fillRect(restartX, btnY, btnWidth, btnHeight);
+    ctx.fillStyle = '#fff';
+    ctx.fillText('STAGE 1', restartX + btnWidth/2, btnY + btnHeight/2 + 6);
+}
+
+// 失敗画面のボタン領域を取得
+function getFailButtons() {
+    var btnWidth = 120;
+    var btnHeight = 45;
+    var btnY = BOARD_HEIGHT/2 + 30;
+    var retryX = BOARD_WIDTH/2 - btnWidth - 10;
+    var restartX = BOARD_WIDTH/2 + 10;
+
+    return {
+        retry: { x: retryX, y: btnY, width: btnWidth, height: btnHeight },
+        restart: { x: restartX, y: btnY, width: btnWidth, height: btnHeight }
+    };
 }
 
 function drawPauseScreen() {
@@ -787,6 +856,25 @@ function handleTouchStart(e) {
         gameStarted = true;
         initStage(stage);
         startBGM();
+        return;
+    }
+
+    if (gameFailed) {
+        // ボタンタップ判定
+        var buttons = getFailButtons();
+        if (touchStartX >= buttons.retry.x && touchStartX <= buttons.retry.x + buttons.retry.width &&
+            touchStartY >= buttons.retry.y && touchStartY <= buttons.retry.y + buttons.retry.height) {
+            // Retry - 同じステージをやり直し
+            initStage(stage);
+            return;
+        }
+        if (touchStartX >= buttons.restart.x && touchStartX <= buttons.restart.x + buttons.restart.width &&
+            touchStartY >= buttons.restart.y && touchStartY <= buttons.restart.y + buttons.restart.height) {
+            // Restart - ステージ1から
+            stage = 1;
+            initStage(stage);
+            return;
+        }
         return;
     }
 
