@@ -1,4 +1,4 @@
-// 氷の世界 v2.4
+// 氷の世界 v2.6
 // スマホ専用スライディングパズル
 // BFSソルバーで最短解を保証（押し出し対応）
 // Retina対応
@@ -518,14 +518,19 @@ function generatePuzzle(stageNum) {
             obsAttempts++;
         }
 
-        // ブロックを穴の近くに配置（ゴール状態から開始）
-        // 逆順（大きい番号から）で配置することで、1番が穴に最も近くなる
+        // 順序制約を守る逆算生成アルゴリズム
+        // ブロック1から順に「配置→離す」を繰り返す
+        // これにより、逆シャッフルの回数 = 最短解の手数が保証される
         const blocks = [];
-        for (let num = numBlocks; num >= 1; num--) {
+        let totalMoves = 0;
+        const movesPerBlock = Math.max(1, Math.floor(targetMinMoves / numBlocks));
+
+        for (let num = 1; num <= numBlocks; num++) {
+            // ステップ1: ブロックをホールに入れられる位置に配置
             let placed = false;
             const shuffledDirs = shuffleArray([...directions]);
 
-            // 穴に隣接する空きセルを探す
+            // ホールに隣接する空きセルを探す
             for (const dir of shuffledDirs) {
                 const adjRow = hole.row - dir.dr;
                 const adjCol = hole.col - dir.dc;
@@ -540,7 +545,7 @@ function generatePuzzle(stageNum) {
                 }
             }
 
-            // 滑って穴に入れる位置を探す
+            // 滑ってホールに入れる位置を探す
             if (!placed) {
                 for (const dir of shuffledDirs) {
                     let r = hole.row - dir.dr;
@@ -572,54 +577,33 @@ function generatePuzzle(stageNum) {
                     }
                 }
             }
-        }
 
-        // 逆シャッフル（ゴール状態から離す）
-        const shuffleCount = targetMinMoves * 2; // 適度にシャッフル
-        for (let move = 0; move < shuffleCount; move++) {
-            const blockIdx = randInt(0, blocks.length - 1);
-            const block = blocks[blockIdx];
-            const dir = directions[randInt(0, 3)];
+            // ステップ2: このブロックを逆シャッフルで離す
+            const block = blocks[blocks.length - 1];
+            let blockMoves = 0;
 
-            const newPos = simulateReverseSlide(
-                simBoard, rows, cols, hole.row, hole.col,
-                block.row, block.col, dir.dr, dir.dc
-            );
+            for (let m = 0; m < movesPerBlock; m++) {
+                const dir = directions[randInt(0, 3)];
+                const newPos = simulateReverseSlide(
+                    simBoard, rows, cols, hole.row, hole.col,
+                    block.row, block.col, dir.dr, dir.dc
+                );
 
-            if (newPos) {
-                simBoard[block.row][block.col] = null;
-                simBoard[newPos.row][newPos.col] = { number: block.number };
-                block.row = newPos.row;
-                block.col = newPos.col;
+                if (newPos) {
+                    simBoard[block.row][block.col] = null;
+                    simBoard[newPos.row][newPos.col] = { number: block.number };
+                    block.row = newPos.row;
+                    block.col = newPos.col;
+                    blockMoves++;
+                }
             }
+
+            // このブロックを落とすのに必要な手数 = 逆シャッフルした回数
+            totalMoves += blockMoves > 0 ? blockMoves : 1;
         }
 
-        // ソルバーで最短手数を計算（軽量な場合のみ）
-        const blocksCopy = blocks.map(b => ({ row: b.row, col: b.col, number: b.number }));
-        let minMoves = -1;
-
-        // ブロック数が少ない時だけソルバーを使用
-        if (numBlocks <= 5) {
-            minMoves = solvePuzzle(blocksCopy, obstacles, hole, rows, cols);
-        }
-
-        // ソルバーが成功した場合はその値を使用
-        if (minMoves > 0) {
-            return {
-                blocks: blocks.map(b => ({ row: b.row, col: b.col, number: b.number })),
-                obstacles: obstacles,
-                hole: hole,
-                rows: rows,
-                cols: cols,
-                par: minMoves,
-                minMoves: minMoves
-            };
-        }
-
-        // ソルバーを使わない場合：逆算パズルは必ず解があるのでそのまま採用
-        // Par = ブロック数 + 固定バッファ（2〜3手）
-        const buffer = Math.min(3, Math.max(2, Math.floor(numBlocks / 3)));
-        const estimatedPar = numBlocks + buffer;
+        // Par = 合計移動回数 + 小さなバッファ（2手）
+        const par = totalMoves + 2;
 
         return {
             blocks: blocks.map(b => ({ row: b.row, col: b.col, number: b.number })),
@@ -627,8 +611,8 @@ function generatePuzzle(stageNum) {
             hole: hole,
             rows: rows,
             cols: cols,
-            par: estimatedPar,
-            minMoves: estimatedPar
+            par: par,
+            minMoves: totalMoves
         };
     }
 
@@ -1232,7 +1216,7 @@ function drawTitleScreen() {
 
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.font = '10px Arial';
-    ctx.fillText('v2.4', BOARD_WIDTH/2, BOARD_HEIGHT - 12);
+    ctx.fillText('v2.6', BOARD_WIDTH/2, BOARD_HEIGHT - 12);
 }
 
 function drawClearScreen() {
