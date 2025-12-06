@@ -1337,13 +1337,24 @@ function handleTouchStart(e) {
 
     if (gameCleared) {
         stage++;
-        initStage(stage);
         gameCleared = false;
+        showingStageMessage = false;  // メッセージ表示中でも次へ
+        initStage(stage);
         return;
     }
 
     if (gamePaused) {
         gamePaused = false;
+        return;
+    }
+
+    // ステージ開始メッセージ表示中はタップでスキップ
+    if (showingStageMessage) {
+        showingStageMessage = false;
+        if (stageMessageTimer) {
+            clearTimeout(stageMessageTimer);
+            stageMessageTimer = null;
+        }
         return;
     }
 
