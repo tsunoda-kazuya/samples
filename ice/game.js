@@ -337,10 +337,8 @@ async function executeSlide(row, col, direction) {
         }
     } else {
         // Place block at final position
+        block.animating = false;
         board[finalPos.row][finalPos.col] = block;
-
-        // Check if this block pushed others
-        // (Future: chain reactions)
     }
 
     isAnimating = false;
@@ -434,12 +432,15 @@ function draw() {
     ctx.fillText(`→${nextNumber}`, holeX + CELL_SIZE/2, holeY + CELL_SIZE - 8);
 
     // Draw blocks
-    for (let row = 0; row < ROWS; row++) {
-        for (let col = 0; col < COLS; col++) {
-            const block = board[row][col];
-            if (block && !block.animating) {
-                drawBlock(col * CELL_SIZE, row * CELL_SIZE, block,
-                    selectedBlock && selectedBlock.row === row && selectedBlock.col === col);
+    if (board && board.length > 0) {
+        for (let row = 0; row < ROWS; row++) {
+            if (!board[row]) continue;
+            for (let col = 0; col < COLS; col++) {
+                const block = board[row][col];
+                if (block && !block.animating) {
+                    drawBlock(col * CELL_SIZE, row * CELL_SIZE, block,
+                        selectedBlock && selectedBlock.row === row && selectedBlock.col === col);
+                }
             }
         }
     }
