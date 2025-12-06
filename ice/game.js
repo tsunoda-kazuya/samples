@@ -1,4 +1,4 @@
-// 氷の世界 v1.1
+// 氷の世界 v1.2
 // スマホ専用スライディングパズル
 
 const canvas = document.getElementById('gameCanvas');
@@ -761,7 +761,7 @@ function drawTitleScreen() {
 
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.font = '10px Arial';
-    ctx.fillText('v1.1', BOARD_WIDTH/2, BOARD_HEIGHT - 12);
+    ctx.fillText('v1.2', BOARD_WIDTH/2, BOARD_HEIGHT - 12);
 }
 
 function drawClearScreen() {
