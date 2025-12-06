@@ -385,24 +385,51 @@ async function executeSlide(row, col, direction) {
 
     isAnimating = true;
 
-    // If there's a pushable block, push it first
+    // If there's a pushable block, we need to push it first
     if (nextBlock && !nextBlock.isObstacle) {
-        // Push the other block
-        const pushResult = calculateSingleSlide(nextRow, nextCol, direction);
+        // Calculate where the pushed block will end up
+        // Remove BOTH blocks temporarily to calculate where pushed block slides to
+        board[row][col] = null;
+        board[nextRow][nextCol] = null;
 
-        if (pushResult.row === nextRow && pushResult.col === nextCol) {
-            // Can't push - blocked
+        // Calculate from the pushed block's NEXT position (one step in direction)
+        var pushStartRow = nextRow + dr;
+        var pushStartCol = nextCol + dc;
+
+        // Check if that next position is valid
+        if (pushStartRow < 0 || pushStartRow >= ROWS || pushStartCol < 0 || pushStartCol >= COLS) {
+            // Would go out of bounds immediately
+            board[row][col] = block;
+            board[nextRow][nextCol] = nextBlock;
             playErrorSound();
             isAnimating = false;
             return;
         }
 
+        // Check if next position is hole
+        var pushResult;
+        if (isHole(pushStartRow, pushStartCol)) {
+            pushResult = { row: pushStartRow, col: pushStartCol, fellInHole: true };
+        } else if (board[pushStartRow][pushStartCol]) {
+            // Blocked by another block/obstacle immediately
+            board[row][col] = block;
+            board[nextRow][nextCol] = nextBlock;
+            playErrorSound();
+            isAnimating = false;
+            return;
+        } else {
+            // Calculate slide from the new position
+            pushResult = calculateSingleSlide(pushStartRow, pushStartCol, direction);
+        }
+
+        // Restore original block (pushed block stays removed for animation)
+        board[row][col] = block;
+
+        // pushResult is already set above, no need to check again
+
         playPushSound();
 
-        // Remove pushed block from original position
-        board[nextRow][nextCol] = null;
-
-        // Animate pushed block
+        // Animate pushed block sliding to wall
         nextBlock.animating = true;
         nextBlock.startX = nextCol * CELL_SIZE;
         nextBlock.startY = nextRow * CELL_SIZE;
@@ -426,8 +453,8 @@ async function executeSlide(row, col, direction) {
                 nextNumber++;
             } else {
                 playErrorSound();
-                debugInfo.textContent = `${nextBlock.number}を落とした！${nextNumber}が必要`;
-                setTimeout(() => initStage(stage), 1500);
+                debugInfo.textContent = nextBlock.number + 'を落とした！' + nextNumber + 'が必要';
+                setTimeout(function() { initStage(stage); }, 1500);
                 isAnimating = false;
                 return;
             }
@@ -437,7 +464,7 @@ async function executeSlide(row, col, direction) {
         }
     }
 
-    // Now slide the original block
+    // Now slide the original block (recalculate since board state changed)
     playSlideSound();
 
     const slideResult = calculateSingleSlide(row, col, direction);
