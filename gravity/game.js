@@ -39,6 +39,7 @@ let tiltY = 0; // gamma: left-right tilt
 
 // Initialize board with some blocks
 function initBoard() {
+    console.log('initBoard called, CELL_SIZE:', CELL_SIZE);
     board = [];
     for (let row = 0; row < ROWS; row++) {
         board[row] = [];
@@ -46,20 +47,27 @@ function initBoard() {
             board[row][col] = null;
         }
     }
-    // Add initial blocks (sparse)
-    for (let i = 0; i < 15; i++) {
-        const row = Math.floor(Math.random() * ROWS);
-        const col = Math.floor(Math.random() * COLS);
-        if (!board[row][col]) {
-            board[row][col] = {
-                color: COLORS[Math.floor(Math.random() * COLORS.length)],
-                x: col * CELL_SIZE,
-                y: row * CELL_SIZE,
-                targetX: col * CELL_SIZE,
-                targetY: row * CELL_SIZE
-            };
-        }
-    }
+    // Add initial blocks - guaranteed positions
+    const positions = [
+        {row: 0, col: 0}, {row: 0, col: 1}, {row: 0, col: 2},
+        {row: 1, col: 0}, {row: 1, col: 3},
+        {row: 2, col: 2}, {row: 2, col: 4},
+        {row: 3, col: 1}, {row: 3, col: 5},
+        {row: 4, col: 0}, {row: 4, col: 3},
+        {row: 5, col: 2}, {row: 5, col: 4},
+        {row: 6, col: 1}, {row: 6, col: 5}
+    ];
+
+    positions.forEach((pos, i) => {
+        board[pos.row][pos.col] = {
+            color: COLORS[i % COLORS.length],
+            x: pos.col * CELL_SIZE,
+            y: pos.row * CELL_SIZE,
+            targetX: pos.col * CELL_SIZE,
+            targetY: pos.row * CELL_SIZE
+        };
+        console.log(`Block at ${pos.row},${pos.col}: x=${pos.col * CELL_SIZE}, y=${pos.row * CELL_SIZE}`);
+    });
 }
 
 // Request device orientation permission (iOS 13+)
@@ -101,8 +109,16 @@ function handleOrientation(event) {
     tiltX = event.beta || 0;
     tiltY = event.gamma || 0;
 
+    // Count blocks for debug
+    let blockCount = 0;
+    for (let row = 0; row < ROWS; row++) {
+        for (let col = 0; col < COLS; col++) {
+            if (board[row] && board[row][col]) blockCount++;
+        }
+    }
+
     // Update debug info
-    debugInfo.innerHTML = `傾き β:${tiltX.toFixed(1)}° γ:${tiltY.toFixed(1)}°<br>重力: ${getGravityDirection()}`;
+    debugInfo.innerHTML = `傾き β:${tiltX.toFixed(1)}° γ:${tiltY.toFixed(1)}°<br>重力: ${getGravityDirection()}<br>ブロック数: ${blockCount}`;
 }
 
 function getGravityDirection() {
@@ -298,7 +314,13 @@ function animateBlocks() {
 }
 
 // Draw game
+let drawCount = 0;
 function draw() {
+    drawCount++;
+    if (drawCount % 60 === 1) {
+        console.log('draw called, BOARD_WIDTH:', BOARD_WIDTH, 'BOARD_HEIGHT:', BOARD_HEIGHT, 'CELL_SIZE:', CELL_SIZE);
+    }
+
     // Clear canvas
     ctx.fillStyle = '#1a1a2e';
     ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
@@ -319,24 +341,27 @@ function draw() {
         ctx.stroke();
     }
 
-    // Draw blocks
+    // Draw blocks using grid position directly (not block.x/y)
+    let blocksDrawn = 0;
     for (let row = 0; row < ROWS; row++) {
         for (let col = 0; col < COLS; col++) {
             const block = board[row][col];
             if (block) {
                 const padding = 3;
                 ctx.fillStyle = block.color;
-                ctx.beginPath();
-                ctx.roundRect(
-                    block.x + padding,
-                    block.y + padding,
+                // Use row/col position directly instead of block.x/y
+                ctx.fillRect(
+                    col * CELL_SIZE + padding,
+                    row * CELL_SIZE + padding,
                     CELL_SIZE - padding * 2,
-                    CELL_SIZE - padding * 2,
-                    8
+                    CELL_SIZE - padding * 2
                 );
-                ctx.fill();
+                blocksDrawn++;
             }
         }
+    }
+    if (drawCount % 60 === 1) {
+        console.log('Blocks drawn:', blocksDrawn);
     }
 
     // Draw gravity indicator
@@ -422,11 +447,35 @@ function gameLoop(timestamp) {
 
 // Start game
 startButton.addEventListener('click', async () => {
-    await requestOrientationPermission();
+    console.log('Start button clicked');
+    debugInfo.textContent = 'ゲーム開始処理中...';
+
+    try {
+        await requestOrientationPermission();
+    } catch (e) {
+        console.log('Orientation error:', e);
+        debugInfo.textContent = '傾き検知: 非対応 (キーボードで操作)';
+    }
+
     initBoard();
     gameRunning = true;
     startButton.style.display = 'none';
+
+    // Debug: count blocks
+    let count = 0;
+    for (let row = 0; row < ROWS; row++) {
+        for (let col = 0; col < COLS; col++) {
+            if (board[row][col]) count++;
+        }
+    }
+    debugInfo.innerHTML = `ゲーム開始！<br>ブロック数: ${count}<br>矢印キーで操作`;
+    console.log('Game started, blocks:', count);
 });
+
+// Initialize board immediately for testing
+initBoard();
+gameRunning = true;
+startButton.style.display = 'none';
 
 // Initial draw
 draw();
