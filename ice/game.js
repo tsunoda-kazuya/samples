@@ -1,12 +1,16 @@
-// 氷の世界 v1.7
+// 氷の世界 v1.8
 // スマホ専用スライディングパズル
 // 逆算式パズル自動生成
+// Retina対応
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const startButton = document.getElementById('startButton');
 const debugInfo = document.getElementById('debugInfo');
 const scoreDisplay = document.getElementById('score');
+
+// Retina対応
+const dpr = window.devicePixelRatio || 1;
 
 // Audio context
 let audioCtx = null;
@@ -150,8 +154,15 @@ function resizeCanvas() {
     CELL_SIZE = Math.floor(maxWidth / COLS);
     BOARD_WIDTH = CELL_SIZE * COLS;
     BOARD_HEIGHT = CELL_SIZE * ROWS;
-    canvas.width = BOARD_WIDTH;
-    canvas.height = BOARD_HEIGHT;
+
+    // Retina対応: 実際のピクセルサイズは大きく、CSS表示サイズは論理サイズ
+    canvas.width = BOARD_WIDTH * dpr;
+    canvas.height = BOARD_HEIGHT * dpr;
+    canvas.style.width = BOARD_WIDTH + 'px';
+    canvas.style.height = BOARD_HEIGHT + 'px';
+
+    // スケール設定
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
@@ -950,7 +961,7 @@ function drawTitleScreen() {
 
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.font = '10px Arial';
-    ctx.fillText('v1.7', BOARD_WIDTH/2, BOARD_HEIGHT - 12);
+    ctx.fillText('v1.8', BOARD_WIDTH/2, BOARD_HEIGHT - 12);
 }
 
 function drawClearScreen() {
