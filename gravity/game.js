@@ -1,4 +1,4 @@
-// Gravity Puzzle - Balanced Implementation
+// Gravity Puzzle v1.0
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const startButton = document.getElementById('startButton');
@@ -158,9 +158,10 @@ function updateGravityFromTilt() {
     // beta (tiltX): 前後の傾き。スマホを普通に持つと約45-60度
     // gamma (tiltY): 左右の傾き。-90〜90度
 
-    // 基準角度を60度に（スマホを少し立てて持つ想定）
-    const baseAngle = 60;
+    // 基準角度を75度に（スマホをやや立てて持つ想定）
+    const baseAngle = 75;
     const threshold = 20;
+    const upThreshold = 35; // 上方向は更に傾けないと反応しない
 
     // 前後の傾きを基準角度からの差分として計算
     const forwardBack = tiltX - baseAngle;
@@ -177,13 +178,12 @@ function updateGravityFromTilt() {
             newGravity = { x: -1, y: 0 }; // 左
         }
     }
-    // 前後の傾きが大きい場合
-    else if (Math.abs(forwardBack) > threshold) {
-        if (forwardBack > 0) {
-            newGravity = { x: 0, y: 1 }; // 下（手前に倒す）
-        } else {
-            newGravity = { x: 0, y: -1 }; // 上（奥に倒す）
-        }
+    // 前後の傾きが大きい場合（上方向は専用閾値）
+    else if (forwardBack > threshold) {
+        newGravity = { x: 0, y: 1 }; // 下（手前に倒す）
+    }
+    else if (forwardBack < -upThreshold) {
+        newGravity = { x: 0, y: -1 }; // 上（奥に大きく倒す）
     }
 
     if (newGravity.x !== gravity.x || newGravity.y !== gravity.y) {
@@ -477,6 +477,11 @@ function draw() {
         ctx.textBaseline = 'middle';
         ctx.fillText('GRAVITY', BOARD_WIDTH/2, BOARD_HEIGHT/2 - 60);
         ctx.fillText('PUZZLE', BOARD_WIDTH/2, BOARD_HEIGHT/2 - 25);
+
+        // Version number
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.font = '12px Arial';
+        ctx.fillText('v1.0', BOARD_WIDTH/2, BOARD_HEIGHT/2 + 130);
 
         ctx.fillStyle = '#fff';
         ctx.font = '14px Arial';
