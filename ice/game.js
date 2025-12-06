@@ -1,4 +1,4 @@
-// 氷の世界 v2.2
+// 氷の世界 v2.3
 // スマホ専用スライディングパズル
 // BFSソルバーで最短解を保証（押し出し対応）
 // Retina対応
@@ -519,8 +519,9 @@ function generatePuzzle(stageNum) {
         }
 
         // ブロックを穴の近くに配置（ゴール状態から開始）
+        // 逆順（大きい番号から）で配置することで、1番が穴に最も近くなる
         const blocks = [];
-        for (let num = 1; num <= numBlocks; num++) {
+        for (let num = numBlocks; num >= 1; num--) {
             let placed = false;
             const shuffledDirs = shuffleArray([...directions]);
 
@@ -593,29 +594,45 @@ function generatePuzzle(stageNum) {
             }
         }
 
-        // ソルバーで最短手数を計算
+        // ソルバーで最短手数を計算（軽量な場合のみ）
         const blocksCopy = blocks.map(b => ({ row: b.row, col: b.col, number: b.number }));
-        const minMoves = solvePuzzle(blocksCopy, obstacles, hole, rows, cols);
+        let minMoves = -1;
 
-        // 解があり、適切な難易度の場合採用
-        if (minMoves > 0 && minMoves >= numBlocks) {
-            // Par = 最短手数そのまま（ソルバーは押し出し未考慮なので余裕あり）
-            const par = minMoves;
+        // ブロック数が少ない時だけソルバーを使用
+        if (numBlocks <= 5) {
+            minMoves = solvePuzzle(blocksCopy, obstacles, hole, rows, cols);
+        }
 
+        // ソルバーが成功した場合はその値を使用
+        if (minMoves > 0) {
             return {
                 blocks: blocks.map(b => ({ row: b.row, col: b.col, number: b.number })),
                 obstacles: obstacles,
                 hole: hole,
                 rows: rows,
                 cols: cols,
-                par: par,
+                par: minMoves,
                 minMoves: minMoves
             };
         }
+
+        // ソルバーを使わない場合：逆算パズルは必ず解があるのでそのまま採用
+        // Par = ブロック数 + シャッフル回数の一部
+        const estimatedPar = numBlocks + Math.ceil(shuffleCount / 4);
+
+        return {
+            blocks: blocks.map(b => ({ row: b.row, col: b.col, number: b.number })),
+            obstacles: obstacles,
+            hole: hole,
+            rows: rows,
+            cols: cols,
+            par: estimatedPar,
+            minMoves: estimatedPar
+        };
     }
 
-    // フォールバック: 単純なパズルを返す
-    console.warn('Could not generate optimal puzzle, using fallback');
+    // ここには到達しないはずだが念のため
+    console.warn('Unexpected fallback');
     return generateSimplePuzzle(stageNum);
 }
 
@@ -1214,7 +1231,7 @@ function drawTitleScreen() {
 
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.font = '10px Arial';
-    ctx.fillText('v2.2', BOARD_WIDTH/2, BOARD_HEIGHT - 12);
+    ctx.fillText('v2.3', BOARD_WIDTH/2, BOARD_HEIGHT - 12);
 }
 
 function drawClearScreen() {
