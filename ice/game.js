@@ -1,6 +1,6 @@
-// 氷の世界 v2.1
+// 氷の世界 v2.2
 // スマホ専用スライディングパズル
-// BFSソルバーで最短解を保証
+// BFSソルバーで最短解を保証（押し出し対応）
 // Retina対応
 // Par表示と星評価システム
 
@@ -1214,7 +1214,7 @@ function drawTitleScreen() {
 
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.font = '10px Arial';
-    ctx.fillText('v2.1', BOARD_WIDTH/2, BOARD_HEIGHT - 12);
+    ctx.fillText('v2.2', BOARD_WIDTH/2, BOARD_HEIGHT - 12);
 }
 
 function drawClearScreen() {
