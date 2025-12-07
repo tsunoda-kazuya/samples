@@ -1948,55 +1948,53 @@ function setupTouchControls() {
         touchStartY = 0;
     }
 
-    // Touch start on joystick - changedTouchesを使って新しいタッチのみ取得
+    // Touch start on joystick
     joystick.addEventListener('touchstart', function(e) {
         e.preventDefault();
         e.stopPropagation();
         // このイベントで開始されたタッチのみを処理
         if (e.changedTouches.length > 0 && joystickTouchId === null) {
-            const touch = e.changedTouches[0];
+            var touch = e.changedTouches[0];
             joystickTouchId = touch.identifier;
             joystickActive = true;
             // タッチ開始位置を記憶（この位置が中心になる）
             touchStartX = touch.clientX;
             touchStartY = touch.clientY;
-            // 開始時は移動なし
         }
     }, { passive: false });
 
-    // Touch move - ジョイスティックで開始されたタッチIDのみ追跡
-    joystick.addEventListener('touchmove', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
+    // Safari対応: documentレベルでtouchmoveを監視
+    document.addEventListener('touchmove', function(e) {
         if (!joystickActive || joystickTouchId === null) return;
 
-        // changedTouchesから該当するタッチを探す
-        for (let i = 0; i < e.changedTouches.length; i++) {
-            if (e.changedTouches[i].identifier === joystickTouchId) {
-                updateJoystick(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
-                break;
+        // すべてのタッチから該当するIDを探す
+        for (var i = 0; i < e.touches.length; i++) {
+            if (e.touches[i].identifier === joystickTouchId) {
+                updateJoystick(e.touches[i].clientX, e.touches[i].clientY);
+                return;
             }
         }
     }, { passive: false });
 
-    // Touch end - 該当するタッチが終了した場合のみリセット
-    joystick.addEventListener('touchend', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        for (let i = 0; i < e.changedTouches.length; i++) {
+    // Safari対応: documentレベルでtouchendを監視
+    document.addEventListener('touchend', function(e) {
+        if (joystickTouchId === null) return;
+
+        for (var i = 0; i < e.changedTouches.length; i++) {
             if (e.changedTouches[i].identifier === joystickTouchId) {
                 resetJoystick();
-                break;
+                return;
             }
         }
     }, { passive: false });
 
-    joystick.addEventListener('touchcancel', function(e) {
-        e.stopPropagation();
-        for (let i = 0; i < e.changedTouches.length; i++) {
+    document.addEventListener('touchcancel', function(e) {
+        if (joystickTouchId === null) return;
+
+        for (var i = 0; i < e.changedTouches.length; i++) {
             if (e.changedTouches[i].identifier === joystickTouchId) {
                 resetJoystick();
-                break;
+                return;
             }
         }
     }, { passive: false });
