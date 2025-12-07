@@ -257,6 +257,16 @@
                 display: block;
             }
         }
+        #version {
+            position: absolute;
+            top: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255,255,255,0.6);
+            font-size: 8px;
+            z-index: 50;
+            text-shadow: 1px 1px 2px #000;
+        }
     </style>
 </head>
 <body>
@@ -270,6 +280,7 @@
         </div>
         <button id="soundToggle" onclick="toggleSound()">🔊</button>
         <button id="pauseBtn" onclick="togglePause()">PAUSE</button>
+        <div id="version">v1.2</div>
         <div id="ui">
             <span>SCORE <span id="score">000000</span></span>
             <span>STAGE <span id="stage">1</span></span>

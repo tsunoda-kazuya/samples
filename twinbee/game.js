@@ -157,34 +157,248 @@ function playGameOver() {
     });
 }
 
-// BGM
+// BGM - TwinBee style upbeat chiptune
 let bgmInterval = null;
 let bgmStep = 0;
+let bgmBeat = 0;
+
+// ツインビー風のポップで明るいメロディ（Fメジャー基調）
+// Note: 0 = rest
 const bgmMelody = [
-    523, 587, 659, 698, 784, 698, 659, 587,
-    523, 587, 659, 784, 880, 784, 659, 523,
-    440, 494, 523, 587, 659, 587, 523, 494,
-    440, 523, 659, 784, 880, 659, 523, 440
+    // イントロ・Aメロ（明るく跳ねるような感じ）
+    698, 698, 880, 880, 1047, 1047, 880, 0,
+    784, 784, 698, 698, 659, 659, 698, 0,
+    698, 698, 880, 880, 1047, 1047, 1175, 0,
+    1319, 1175, 1047, 880, 784, 698, 784, 0,
+    // Bメロ（サビ前の盛り上がり）
+    880, 880, 1047, 1047, 1175, 1175, 1319, 0,
+    1175, 1175, 1047, 1047, 880, 880, 784, 0,
+    880, 1047, 1175, 1319, 1397, 1319, 1175, 1047,
+    880, 784, 698, 659, 587, 659, 698, 0,
+    // サビ（キャッチーなフレーズ）
+    1047, 0, 1047, 1175, 1319, 0, 1175, 1047,
+    880, 0, 880, 784, 698, 0, 784, 880,
+    1047, 0, 1047, 1175, 1319, 1397, 1568, 0,
+    1397, 1319, 1175, 1047, 880, 784, 698, 0,
+    // サビ後半
+    1319, 0, 1319, 1175, 1047, 0, 880, 784,
+    880, 0, 880, 1047, 1175, 0, 1047, 880,
+    698, 784, 880, 1047, 1175, 1319, 1397, 1568,
+    1760, 1568, 1397, 1319, 1175, 1047, 880, 0
 ];
+
+// ベースライン（ルート音を刻む）
 const bgmBass = [
-    262, 262, 294, 294, 330, 330, 349, 349,
-    262, 262, 330, 330, 392, 392, 330, 262,
-    220, 220, 262, 262, 330, 330, 294, 294,
-    220, 262, 330, 392, 440, 330, 262, 220
+    // Aメロ
+    349, 0, 349, 0, 349, 0, 349, 349,
+    294, 0, 294, 0, 294, 0, 294, 294,
+    349, 0, 349, 0, 349, 0, 349, 349,
+    392, 0, 392, 0, 349, 0, 349, 349,
+    // Bメロ
+    440, 0, 440, 0, 440, 0, 440, 440,
+    392, 0, 392, 0, 392, 0, 392, 392,
+    349, 0, 349, 0, 349, 0, 349, 349,
+    294, 0, 294, 0, 262, 0, 294, 349,
+    // サビ
+    349, 0, 349, 0, 440, 0, 440, 0,
+    294, 0, 294, 0, 349, 0, 349, 0,
+    349, 0, 349, 0, 440, 0, 523, 0,
+    392, 0, 349, 0, 294, 0, 349, 349,
+    // サビ後半
+    440, 0, 440, 0, 349, 0, 349, 0,
+    294, 0, 294, 0, 392, 0, 392, 0,
+    349, 0, 349, 0, 440, 0, 523, 0,
+    587, 0, 523, 0, 440, 0, 349, 349
 ];
+
+// ドラムパターン
+const drumPattern = [
+    1, 0, 2, 0, 1, 0, 2, 2,  // 1=kick, 2=snare, 3=hihat
+    1, 0, 2, 0, 1, 0, 2, 0,
+    1, 0, 2, 0, 1, 0, 2, 2,
+    1, 0, 2, 0, 1, 2, 1, 2
+];
+
+// アルペジオ/コード
+const arpPattern = [
+    523, 659, 784, 659, 523, 659, 784, 659,
+    494, 622, 740, 622, 494, 622, 740, 622,
+    523, 659, 784, 659, 523, 659, 784, 659,
+    587, 698, 880, 698, 587, 698, 880, 698
+];
+
+function playDrum(type) {
+    if (!soundEnabled || !audioContext) return;
+    try {
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        const now = audioContext.currentTime;
+
+        if (type === 1) {
+            // Kick drum
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(150, now);
+            osc.frequency.exponentialRampToValueAtTime(40, now + 0.1);
+            gain.gain.setValueAtTime(0.4, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+            osc.start(now);
+            osc.stop(now + 0.15);
+        } else if (type === 2) {
+            // Snare (noise-like)
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(200, now);
+            osc.frequency.exponentialRampToValueAtTime(80, now + 0.05);
+            gain.gain.setValueAtTime(0.25, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+            osc.start(now);
+            osc.stop(now + 0.1);
+
+            // Add noise component
+            const noise = audioContext.createOscillator();
+            const noiseGain = audioContext.createGain();
+            noise.type = 'square';
+            noise.frequency.setValueAtTime(400, now);
+            noiseGain.gain.setValueAtTime(0.1, now);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+            noise.connect(noiseGain);
+            noiseGain.connect(audioContext.destination);
+            noise.start(now);
+            noise.stop(now + 0.08);
+        } else if (type === 3) {
+            // Hi-hat
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(800, now);
+            gain.gain.setValueAtTime(0.08, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.03);
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+            osc.start(now);
+            osc.stop(now + 0.03);
+        }
+    } catch (e) {}
+}
+
+function playMelodyNote(freq, duration, volume = 0.18) {
+    if (!soundEnabled || !audioContext || freq === 0) return;
+    try {
+        const now = audioContext.currentTime;
+
+        // Main melody (square wave with slight detune for richness)
+        const osc1 = audioContext.createOscillator();
+        const osc2 = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+
+        osc1.type = 'square';
+        osc2.type = 'square';
+        osc1.frequency.setValueAtTime(freq, now);
+        osc2.frequency.setValueAtTime(freq * 1.003, now); // Slight detune
+
+        gain.gain.setValueAtTime(volume, now);
+        gain.gain.setValueAtTime(volume * 0.8, now + duration * 0.7);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(audioContext.destination);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + duration);
+        osc2.stop(now + duration);
+    } catch (e) {}
+}
+
+function playBassNote(freq, duration) {
+    if (!soundEnabled || !audioContext || freq === 0) return;
+    try {
+        const now = audioContext.currentTime;
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq / 2, now);
+
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + duration * 0.9);
+
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+
+        osc.start(now);
+        osc.stop(now + duration);
+    } catch (e) {}
+}
+
+function playArpNote(freq, duration) {
+    if (!soundEnabled || !audioContext || freq === 0) return;
+    try {
+        const now = audioContext.currentTime;
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now);
+
+        gain.gain.setValueAtTime(0.06, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+
+        osc.start(now);
+        osc.stop(now + duration);
+    } catch (e) {}
+}
 
 function startBGM() {
     if (bgmInterval) return;
     bgmStep = 0;
+    bgmBeat = 0;
+
+    // テンポ: 約150 BPM (1拍 = 100ms, 16分音符 = 100ms)
+    const tempo = 100;
+
     bgmInterval = setInterval(() => {
         if (!gamePaused && soundEnabled && audioContext) {
-            const melodyNote = bgmMelody[bgmStep % bgmMelody.length];
-            const bassNote = bgmBass[bgmStep % bgmBass.length];
-            playTone(melodyNote, 0.12, 'square', 0.15);
-            playTone(bassNote / 2, 0.12, 'triangle', 0.1);
+            const melodyIdx = bgmStep % bgmMelody.length;
+            const bassIdx = bgmStep % bgmBass.length;
+            const drumIdx = bgmStep % drumPattern.length;
+            const arpIdx = bgmStep % arpPattern.length;
+
+            // メロディ（8分音符刻み風）
+            if (bgmStep % 2 === 0) {
+                const melodyNote = bgmMelody[Math.floor(melodyIdx / 2) % (bgmMelody.length / 2)];
+                playMelodyNote(melodyNote, 0.18);
+            }
+
+            // ベース
+            const bassNote = bgmBass[bassIdx];
+            playBassNote(bassNote, 0.09);
+
+            // ドラム
+            const drum = drumPattern[drumIdx];
+            if (drum > 0) {
+                playDrum(drum);
+            }
+            // ハイハットを裏拍で
+            if (bgmStep % 2 === 1) {
+                playDrum(3);
+            }
+
+            // アルペジオ（控えめに）
+            if (bgmStep % 4 === 0) {
+                const arpNote = arpPattern[Math.floor(arpIdx / 4) % (arpPattern.length / 4)];
+                playArpNote(arpNote * 2, 0.15);
+            }
+
             bgmStep++;
+            bgmBeat = (bgmBeat + 1) % 16;
         }
-    }, 150);
+    }, 100);
 }
 
 function stopBGM() {
@@ -207,97 +421,207 @@ function drawTwinBee(x, y, invincible) {
         ctx.globalAlpha = 0.5;
     }
 
-    // Main body (light blue oval)
-    ctx.fillStyle = '#87CEEB';
+    // 影（地上に落ちる）
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    ctx.beginPath();
+    ctx.ellipse(0, 25, 12, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Main body - グラデーション
+    const bodyGrad = ctx.createRadialGradient(-3, -3, 0, 0, 0, 16);
+    bodyGrad.addColorStop(0, '#B0E0FF');
+    bodyGrad.addColorStop(0.5, '#87CEEB');
+    bodyGrad.addColorStop(1, '#5BA3D9');
+    ctx.fillStyle = bodyGrad;
     ctx.beginPath();
     ctx.ellipse(0, 0, 14, 16, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = '#4169E1';
+
+    // Body outline
+    ctx.strokeStyle = '#3A7CA5';
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Cockpit window
-    ctx.fillStyle = '#FFD700';
+    // Body highlight
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.beginPath();
+    ctx.ellipse(-5, -6, 5, 7, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Cockpit window - グラデーション
+    const cockpitGrad = ctx.createRadialGradient(-2, -6, 0, 0, -4, 8);
+    cockpitGrad.addColorStop(0, '#FFED8A');
+    cockpitGrad.addColorStop(0.6, '#FFD700');
+    cockpitGrad.addColorStop(1, '#DAA520');
+    ctx.fillStyle = cockpitGrad;
     ctx.beginPath();
     ctx.ellipse(0, -4, 8, 6, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = '#DAA520';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#B8860B';
+    ctx.lineWidth = 1.5;
     ctx.stroke();
 
+    // Cockpit shine
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.beginPath();
+    ctx.ellipse(-3, -6, 3, 2, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+
     // Pilot face
-    ctx.fillStyle = '#FFE4C4';
+    ctx.fillStyle = '#FFDAB9';
     ctx.beginPath();
     ctx.arc(0, -4, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#DEB887';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+
+    // Cheeks
+    ctx.fillStyle = 'rgba(255, 150, 150, 0.5)';
+    ctx.beginPath();
+    ctx.ellipse(-3, -3, 1.5, 1, 0, 0, Math.PI * 2);
+    ctx.ellipse(3, -3, 1.5, 1, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // Eyes
     ctx.fillStyle = '#000';
     ctx.beginPath();
-    ctx.arc(-2, -5, 1, 0, Math.PI * 2);
-    ctx.arc(2, -5, 1, 0, Math.PI * 2);
+    ctx.arc(-2, -5, 1.2, 0, Math.PI * 2);
+    ctx.arc(2, -5, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+    // Eye highlights
+    ctx.fillStyle = '#FFF';
+    ctx.beginPath();
+    ctx.arc(-1.5, -5.5, 0.5, 0, Math.PI * 2);
+    ctx.arc(2.5, -5.5, 0.5, 0, Math.PI * 2);
     ctx.fill();
 
-    // Arms (boxing gloves)
+    // Arms (boxing gloves) - より詳細に
     if (player.armLeft) {
-        ctx.fillStyle = '#FF6B6B';
-        ctx.beginPath();
-        ctx.ellipse(-18, 2, 6, 5, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#CC4444';
-        ctx.stroke();
         // Arm connector
         ctx.fillStyle = '#87CEEB';
-        ctx.fillRect(-14, -1, 4, 6);
+        ctx.fillRect(-14, -1, 5, 6);
+        ctx.strokeStyle = '#5BA3D9';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(-14, -1, 5, 6);
+
+        // Glove - グラデーション
+        const gloveGrad = ctx.createRadialGradient(-17, 0, 0, -18, 2, 7);
+        gloveGrad.addColorStop(0, '#FF9999');
+        gloveGrad.addColorStop(0.6, '#FF6B6B');
+        gloveGrad.addColorStop(1, '#CC4444');
+        ctx.fillStyle = gloveGrad;
+        ctx.beginPath();
+        ctx.ellipse(-18, 2, 7, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#AA3333';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        // Glove highlight
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.beginPath();
+        ctx.ellipse(-20, 0, 2, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
     }
 
     if (player.armRight) {
-        ctx.fillStyle = '#FF6B6B';
-        ctx.beginPath();
-        ctx.ellipse(18, 2, 6, 5, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#CC4444';
-        ctx.stroke();
         // Arm connector
         ctx.fillStyle = '#87CEEB';
-        ctx.fillRect(10, -1, 4, 6);
+        ctx.fillRect(9, -1, 5, 6);
+        ctx.strokeStyle = '#5BA3D9';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(9, -1, 5, 6);
+
+        // Glove
+        const gloveGrad = ctx.createRadialGradient(17, 0, 0, 18, 2, 7);
+        gloveGrad.addColorStop(0, '#FF9999');
+        gloveGrad.addColorStop(0.6, '#FF6B6B');
+        gloveGrad.addColorStop(1, '#CC4444');
+        ctx.fillStyle = gloveGrad;
+        ctx.beginPath();
+        ctx.ellipse(18, 2, 7, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#AA3333';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        // Glove highlight
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.beginPath();
+        ctx.ellipse(16, 0, 2, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
     }
 
-    // Feet
-    ctx.fillStyle = '#FF6B6B';
+    // Feet - グラデーション
+    const feetGrad = ctx.createRadialGradient(0, 13, 0, 0, 14, 6);
+    feetGrad.addColorStop(0, '#FF9999');
+    feetGrad.addColorStop(1, '#FF6B6B');
+    ctx.fillStyle = feetGrad;
     ctx.beginPath();
-    ctx.ellipse(-6, 14, 5, 4, -0.3, 0, Math.PI * 2);
+    ctx.ellipse(-6, 14, 6, 5, -0.3, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = '#CC4444';
+    ctx.lineWidth = 1;
+    ctx.stroke();
     ctx.beginPath();
-    ctx.ellipse(6, 14, 5, 4, 0.3, 0, Math.PI * 2);
+    ctx.ellipse(6, 14, 6, 5, 0.3, 0, Math.PI * 2);
     ctx.fill();
+    ctx.stroke();
 
-    // Propeller on top
+    // Propeller on top - アニメーション改良
     const propAngle = frameCount * 0.5;
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(-10 * Math.cos(propAngle), -18);
-    ctx.lineTo(10 * Math.cos(propAngle), -18);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(-10 * Math.sin(propAngle), -18);
-    ctx.lineTo(10 * Math.sin(propAngle), -18);
-    ctx.stroke();
+    ctx.strokeStyle = '#555';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+
+    // プロペラブレード（回転）
+    for (let i = 0; i < 4; i++) {
+        const angle = propAngle + (i * Math.PI / 2);
+        ctx.beginPath();
+        ctx.moveTo(0, -18);
+        ctx.lineTo(Math.cos(angle) * 12, -18 + Math.sin(angle) * 3);
+        ctx.stroke();
+    }
 
     // Propeller hub
-    ctx.fillStyle = '#FFD700';
+    const hubGrad = ctx.createRadialGradient(-1, -19, 0, 0, -18, 4);
+    hubGrad.addColorStop(0, '#FFE44D');
+    hubGrad.addColorStop(1, '#DAA520');
+    ctx.fillStyle = hubGrad;
     ctx.beginPath();
-    ctx.arc(0, -18, 3, 0, Math.PI * 2);
+    ctx.arc(0, -18, 4, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = '#B8860B';
+    ctx.lineWidth = 1;
+    ctx.stroke();
 
-    // Shield effect
+    // Shield effect - より豪華に
     if (player.hasShield) {
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.6)';
-        ctx.lineWidth = 3;
+        const shieldSize = 24 + Math.sin(frameCount * 0.15) * 2;
+        // 外側のグロー
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
+        ctx.lineWidth = 6;
         ctx.beginPath();
-        ctx.arc(0, 0, 22 + Math.sin(frameCount * 0.2) * 2, 0, Math.PI * 2);
+        ctx.arc(0, 0, shieldSize + 4, 0, Math.PI * 2);
         ctx.stroke();
+        // メインシールド
+        const shieldGrad = ctx.createRadialGradient(0, 0, shieldSize - 5, 0, 0, shieldSize);
+        shieldGrad.addColorStop(0, 'rgba(0, 255, 255, 0)');
+        shieldGrad.addColorStop(0.7, 'rgba(0, 255, 255, 0.2)');
+        shieldGrad.addColorStop(1, 'rgba(0, 255, 255, 0.6)');
+        ctx.fillStyle = shieldGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, shieldSize, 0, Math.PI * 2);
+        ctx.fill();
+        // キラキラエフェクト
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        for (let i = 0; i < 6; i++) {
+            const sparkAngle = frameCount * 0.1 + i * Math.PI / 3;
+            const sparkX = Math.cos(sparkAngle) * shieldSize;
+            const sparkY = Math.sin(sparkAngle) * shieldSize;
+            ctx.beginPath();
+            ctx.arc(sparkX, sparkY, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
 
     ctx.restore();
@@ -307,23 +631,51 @@ function drawOption(x, y) {
     ctx.save();
     ctx.translate(x, y);
 
-    // Small helper ship
-    ctx.fillStyle = '#FFA500';
+    // 影
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
     ctx.beginPath();
-    ctx.ellipse(0, 0, 8, 10, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 15, 6, 3, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = '#CC7000';
-    ctx.lineWidth = 1;
+
+    // Small helper ship - グラデーション
+    const bodyGrad = ctx.createRadialGradient(-2, -2, 0, 0, 0, 10);
+    bodyGrad.addColorStop(0, '#FFD080');
+    bodyGrad.addColorStop(0.5, '#FFA500');
+    bodyGrad.addColorStop(1, '#CC7000');
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 9, 11, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#996600';
+    ctx.lineWidth = 1.5;
     ctx.stroke();
+
+    // ハイライト
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.beginPath();
+    ctx.ellipse(-3, -4, 3, 4, -0.3, 0, Math.PI * 2);
+    ctx.fill();
 
     // Eye
     ctx.fillStyle = '#FFF';
     ctx.beginPath();
-    ctx.arc(0, -2, 4, 0, Math.PI * 2);
+    ctx.arc(0, -2, 5, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Pupil（動く）
+    const eyeMove = Math.sin(frameCount * 0.1) * 1;
     ctx.fillStyle = '#000';
     ctx.beginPath();
-    ctx.arc(0, -2, 2, 0, Math.PI * 2);
+    ctx.arc(eyeMove, -2, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Eye highlight
+    ctx.fillStyle = '#FFF';
+    ctx.beginPath();
+    ctx.arc(eyeMove + 1, -3, 1, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.restore();
@@ -337,32 +689,93 @@ function drawBell(bell) {
     const swing = Math.sin(frameCount * 0.15) * 0.2;
     ctx.rotate(swing);
 
-    // Bell body
-    ctx.fillStyle = bell.color;
+    // 影
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    ctx.beginPath();
+    ctx.ellipse(2, 18, 8, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bell body - グラデーション
+    const bellGrad = ctx.createLinearGradient(-10, -12, 10, 12);
+    if (bell.colorName === 'YELLOW') {
+        bellGrad.addColorStop(0, '#FFF8B0');
+        bellGrad.addColorStop(0.3, '#FFD700');
+        bellGrad.addColorStop(0.7, '#DAA520');
+        bellGrad.addColorStop(1, '#B8860B');
+    } else if (bell.colorName === 'BLUE') {
+        bellGrad.addColorStop(0, '#87CEEB');
+        bellGrad.addColorStop(0.3, '#4169E1');
+        bellGrad.addColorStop(0.7, '#0000CD');
+        bellGrad.addColorStop(1, '#00008B');
+    } else if (bell.colorName === 'WHITE') {
+        bellGrad.addColorStop(0, '#FFFFFF');
+        bellGrad.addColorStop(0.3, '#F0F0F0');
+        bellGrad.addColorStop(0.7, '#D0D0D0');
+        bellGrad.addColorStop(1, '#A0A0A0');
+    } else if (bell.colorName === 'GREEN') {
+        bellGrad.addColorStop(0, '#90EE90');
+        bellGrad.addColorStop(0.3, '#32CD32');
+        bellGrad.addColorStop(0.7, '#228B22');
+        bellGrad.addColorStop(1, '#006400');
+    } else if (bell.colorName === 'RED') {
+        bellGrad.addColorStop(0, '#FFA0A0');
+        bellGrad.addColorStop(0.3, '#FF4444');
+        bellGrad.addColorStop(0.7, '#CC0000');
+        bellGrad.addColorStop(1, '#8B0000');
+    } else {
+        bellGrad.addColorStop(0, bell.color);
+        bellGrad.addColorStop(1, bell.color);
+    }
+
+    ctx.fillStyle = bellGrad;
     ctx.beginPath();
     ctx.moveTo(-10, -8);
-    ctx.quadraticCurveTo(-12, 8, 0, 12);
+    ctx.quadraticCurveTo(-12, 8, 0, 14);
     ctx.quadraticCurveTo(12, 8, 10, -8);
     ctx.quadraticCurveTo(5, -12, 0, -12);
     ctx.quadraticCurveTo(-5, -12, -10, -8);
     ctx.fill();
 
     // Bell outline
-    ctx.strokeStyle = '#000';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Inner rim
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
     ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(0, 10, 8, 0.2, Math.PI - 0.2);
     ctx.stroke();
 
     // Bell clapper
-    ctx.fillStyle = '#333';
+    ctx.fillStyle = '#444';
     ctx.beginPath();
-    ctx.arc(0, 6, 3, 0, Math.PI * 2);
+    ctx.arc(0, 8, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#666';
+    ctx.beginPath();
+    ctx.arc(-1, 7, 1.5, 0, Math.PI * 2);
     ctx.fill();
 
-    // Shine
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    // Multiple shine effects
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
     ctx.beginPath();
-    ctx.ellipse(-4, -4, 3, 4, -0.5, 0, Math.PI * 2);
+    ctx.ellipse(-4, -4, 4, 5, -0.4, 0, Math.PI * 2);
     ctx.fill();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.beginPath();
+    ctx.ellipse(3, 2, 2, 3, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // キラキラエフェクト
+    if (frameCount % 20 < 10) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.beginPath();
+        ctx.arc(-5, -6, 2, 0, Math.PI * 2);
+        ctx.fill();
+    }
 
     ctx.restore();
 }
@@ -371,45 +784,101 @@ function drawCloud(cloud) {
     ctx.save();
     ctx.translate(cloud.x, cloud.y);
 
-    ctx.fillStyle = cloud.hasBell ? '#E8E8E8' : '#D3D3D3';
-
-    // Fluffy cloud shape
+    // 影
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
     ctx.beginPath();
-    ctx.arc(-12, 0, 12, 0, Math.PI * 2);
-    ctx.arc(8, -4, 14, 0, Math.PI * 2);
-    ctx.arc(12, 8, 10, 0, Math.PI * 2);
-    ctx.arc(-8, 8, 10, 0, Math.PI * 2);
+    ctx.ellipse(3, 25, 20, 8, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = '#BBB';
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    // Cloud gradient
+    const cloudGrad = ctx.createRadialGradient(0, -5, 0, 0, 5, 30);
+    if (cloud.hasBell) {
+        cloudGrad.addColorStop(0, '#FFFFFF');
+        cloudGrad.addColorStop(0.5, '#F5F5F5');
+        cloudGrad.addColorStop(1, '#E0E0E0');
+    } else {
+        cloudGrad.addColorStop(0, '#F0F0F0');
+        cloudGrad.addColorStop(0.5, '#D8D8D8');
+        cloudGrad.addColorStop(1, '#C0C0C0');
+    }
+
+    ctx.fillStyle = cloudGrad;
+
+    // Fluffy cloud shape - より立体的に
+    ctx.beginPath();
+    ctx.arc(-15, 2, 14, 0, Math.PI * 2);
+    ctx.arc(0, -6, 16, 0, Math.PI * 2);
+    ctx.arc(15, 2, 14, 0, Math.PI * 2);
+    ctx.arc(10, 10, 12, 0, Math.PI * 2);
+    ctx.arc(-10, 10, 12, 0, Math.PI * 2);
+    ctx.arc(0, 8, 14, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 上部のハイライト
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.beginPath();
+    ctx.arc(-10, -4, 8, 0, Math.PI * 2);
+    ctx.arc(5, -8, 10, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 下部の影
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+    ctx.beginPath();
+    ctx.ellipse(0, 12, 22, 6, 0, 0, Math.PI);
+    ctx.fill();
+
+    // ベルがある場合のキラキラ
+    if (cloud.hasBell && frameCount % 30 < 15) {
+        ctx.fillStyle = 'rgba(255, 255, 100, 0.7)';
+        ctx.beginPath();
+        ctx.arc(0, 0, 3, 0, Math.PI * 2);
+        ctx.fill();
+    }
 
     ctx.restore();
 }
 
 function drawBullet(bullet) {
-    ctx.fillStyle = bullet.color || '#FFD700';
+    // Outer glow
+    const glowGrad = ctx.createRadialGradient(bullet.x, bullet.y, 0, bullet.x, bullet.y, bullet.width);
+    glowGrad.addColorStop(0, 'rgba(255, 255, 150, 0.8)');
+    glowGrad.addColorStop(0.5, 'rgba(255, 200, 50, 0.4)');
+    glowGrad.addColorStop(1, 'rgba(255, 150, 0, 0)');
+    ctx.fillStyle = glowGrad;
     ctx.beginPath();
-    ctx.ellipse(bullet.x, bullet.y, bullet.width / 2, bullet.height / 2, 0, 0, Math.PI * 2);
+    ctx.arc(bullet.x, bullet.y, bullet.width, 0, Math.PI * 2);
     ctx.fill();
 
-    // Glow effect
-    ctx.fillStyle = 'rgba(255, 255, 200, 0.5)';
+    // Core bullet
+    const coreGrad = ctx.createRadialGradient(bullet.x - 1, bullet.y - 2, 0, bullet.x, bullet.y, bullet.width / 2);
+    coreGrad.addColorStop(0, '#FFFFFF');
+    coreGrad.addColorStop(0.3, '#FFFF80');
+    coreGrad.addColorStop(1, '#FFD700');
+    ctx.fillStyle = coreGrad;
     ctx.beginPath();
-    ctx.arc(bullet.x, bullet.y, bullet.width / 2 + 2, 0, Math.PI * 2);
+    ctx.ellipse(bullet.x, bullet.y, bullet.width / 2, bullet.height / 2, 0, 0, Math.PI * 2);
     ctx.fill();
 }
 
 function drawEnemyBullet(bullet) {
-    ctx.fillStyle = '#FF4444';
+    // Outer glow
+    const glowGrad = ctx.createRadialGradient(bullet.x, bullet.y, 0, bullet.x, bullet.y, 8);
+    glowGrad.addColorStop(0, 'rgba(255, 100, 100, 0.6)');
+    glowGrad.addColorStop(0.5, 'rgba(255, 50, 50, 0.3)');
+    glowGrad.addColorStop(1, 'rgba(255, 0, 0, 0)');
+    ctx.fillStyle = glowGrad;
     ctx.beginPath();
-    ctx.arc(bullet.x, bullet.y, 4, 0, Math.PI * 2);
+    ctx.arc(bullet.x, bullet.y, 8, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = '#FFAAAA';
+    // Core
+    const coreGrad = ctx.createRadialGradient(bullet.x - 1, bullet.y - 1, 0, bullet.x, bullet.y, 4);
+    coreGrad.addColorStop(0, '#FFFFFF');
+    coreGrad.addColorStop(0.4, '#FF8888');
+    coreGrad.addColorStop(1, '#FF2222');
+    ctx.fillStyle = coreGrad;
     ctx.beginPath();
-    ctx.arc(bullet.x - 1, bullet.y - 1, 2, 0, Math.PI * 2);
+    ctx.arc(bullet.x, bullet.y, 4, 0, Math.PI * 2);
     ctx.fill();
 }
 
@@ -417,74 +886,210 @@ function drawAirEnemy(enemy) {
     ctx.save();
     ctx.translate(enemy.x, enemy.y);
 
+    // 影
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    ctx.beginPath();
+    ctx.ellipse(0, 20, 10, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
     switch (enemy.type) {
         case 'bee':
-            // Bee enemy (similar to TwinBee but evil)
-            ctx.fillStyle = '#8B0000';
+            // Bee enemy - 悪いツインビー風
+            // Body gradient
+            const beeGrad = ctx.createRadialGradient(-2, -2, 0, 0, 0, 14);
+            beeGrad.addColorStop(0, '#FF6060');
+            beeGrad.addColorStop(0.5, '#CC0000');
+            beeGrad.addColorStop(1, '#8B0000');
+            ctx.fillStyle = beeGrad;
             ctx.beginPath();
-            ctx.ellipse(0, 0, 12, 14, 0, 0, Math.PI * 2);
+            ctx.ellipse(0, 0, 13, 15, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#550000';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Highlight
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.beginPath();
+            ctx.ellipse(-4, -5, 4, 5, -0.3, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Cockpit
+            const beeCockpit = ctx.createRadialGradient(-1, -4, 0, 0, -2, 6);
+            beeCockpit.addColorStop(0, '#FFD080');
+            beeCockpit.addColorStop(1, '#996600');
+            ctx.fillStyle = beeCockpit;
+            ctx.beginPath();
+            ctx.ellipse(0, -2, 7, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eyes - 怒り目
+            ctx.fillStyle = '#FFF';
+            ctx.beginPath();
+            ctx.arc(-3, -3, 3.5, 0, Math.PI * 2);
+            ctx.arc(3, -3, 3.5, 0, Math.PI * 2);
             ctx.fill();
             ctx.fillStyle = '#FF0000';
             ctx.beginPath();
-            ctx.ellipse(0, -2, 6, 4, 0, 0, Math.PI * 2);
-            ctx.fill();
-            // Eyes
-            ctx.fillStyle = '#FFF';
-            ctx.beginPath();
-            ctx.arc(-3, -3, 3, 0, Math.PI * 2);
-            ctx.arc(3, -3, 3, 0, Math.PI * 2);
+            ctx.arc(-3, -2.5, 2, 0, Math.PI * 2);
+            ctx.arc(3, -2.5, 2, 0, Math.PI * 2);
             ctx.fill();
             ctx.fillStyle = '#000';
             ctx.beginPath();
-            ctx.arc(-3, -3, 1.5, 0, Math.PI * 2);
-            ctx.arc(3, -3, 1.5, 0, Math.PI * 2);
+            ctx.arc(-3, -2.5, 1, 0, Math.PI * 2);
+            ctx.arc(3, -2.5, 1, 0, Math.PI * 2);
             ctx.fill();
+
+            // 怒り眉毛
+            ctx.strokeStyle = '#550000';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-6, -6);
+            ctx.lineTo(-1, -5);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(6, -6);
+            ctx.lineTo(1, -5);
+            ctx.stroke();
             break;
 
         case 'spinner':
-            // Spinning enemy
-            ctx.rotate(frameCount * 0.1);
-            ctx.fillStyle = '#9932CC';
-            ctx.fillRect(-10, -3, 20, 6);
-            ctx.fillRect(-3, -10, 6, 20);
-            ctx.fillStyle = '#DDA0DD';
+            // Spinning enemy - グラデーション
+            ctx.rotate(frameCount * 0.15);
+
+            const spinGrad = ctx.createLinearGradient(-12, 0, 12, 0);
+            spinGrad.addColorStop(0, '#9932CC');
+            spinGrad.addColorStop(0.5, '#DA70D6');
+            spinGrad.addColorStop(1, '#9932CC');
+            ctx.fillStyle = spinGrad;
+
+            // 4枚の羽
+            for (let i = 0; i < 4; i++) {
+                ctx.save();
+                ctx.rotate(i * Math.PI / 2);
+                ctx.beginPath();
+                ctx.moveTo(-3, 0);
+                ctx.lineTo(0, -14);
+                ctx.lineTo(3, 0);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Center core
+            const spinCore = ctx.createRadialGradient(0, 0, 0, 0, 0, 6);
+            spinCore.addColorStop(0, '#FFFFFF');
+            spinCore.addColorStop(0.5, '#FFB0FF');
+            spinCore.addColorStop(1, '#9932CC');
+            ctx.fillStyle = spinCore;
             ctx.beginPath();
-            ctx.arc(0, 0, 5, 0, Math.PI * 2);
+            ctx.arc(0, 0, 6, 0, Math.PI * 2);
             ctx.fill();
+            ctx.strokeStyle = '#6B238E';
+            ctx.lineWidth = 1;
+            ctx.stroke();
             break;
 
         case 'floater':
             // Floating jellyfish-like enemy
-            ctx.fillStyle = '#00CED1';
+            // Head gradient
+            const floatGrad = ctx.createRadialGradient(-3, -5, 0, 0, 0, 14);
+            floatGrad.addColorStop(0, '#80FFFF');
+            floatGrad.addColorStop(0.5, '#00CED1');
+            floatGrad.addColorStop(1, '#008B8B');
+            ctx.fillStyle = floatGrad;
             ctx.beginPath();
-            ctx.arc(0, 0, 12, Math.PI, 0);
+            ctx.arc(0, 0, 14, Math.PI, 0, false);
+            ctx.quadraticCurveTo(14, 5, 10, 4);
+            ctx.lineTo(-10, 4);
+            ctx.quadraticCurveTo(-14, 5, -14, 0);
             ctx.fill();
-            // Tentacles
-            ctx.strokeStyle = '#00CED1';
-            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#006666';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Eyes
+            ctx.fillStyle = '#FFF';
+            ctx.beginPath();
+            ctx.arc(-4, -3, 3, 0, Math.PI * 2);
+            ctx.arc(4, -3, 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(-4, -2, 1.5, 0, Math.PI * 2);
+            ctx.arc(4, -2, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Tentacles - より有機的に
             for (let i = -2; i <= 2; i++) {
+                const tentGrad = ctx.createLinearGradient(i * 4, 4, i * 4, 20);
+                tentGrad.addColorStop(0, '#00CED1');
+                tentGrad.addColorStop(1, 'rgba(0, 206, 209, 0.3)');
+                ctx.strokeStyle = tentGrad;
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
                 ctx.beginPath();
-                ctx.moveTo(i * 4, 0);
-                const wave = Math.sin(frameCount * 0.1 + i) * 3;
-                ctx.quadraticCurveTo(i * 4 + wave, 8, i * 4, 16);
+                ctx.moveTo(i * 5, 4);
+                const wave1 = Math.sin(frameCount * 0.1 + i) * 4;
+                const wave2 = Math.sin(frameCount * 0.15 + i * 2) * 3;
+                ctx.quadraticCurveTo(i * 5 + wave1, 12, i * 5 + wave2, 20);
                 ctx.stroke();
             }
             break;
 
         case 'bomber':
             // Large bomber enemy
-            ctx.fillStyle = '#2F4F4F';
+            // Main body
+            const bombGrad = ctx.createRadialGradient(-3, -3, 0, 0, 0, 20);
+            bombGrad.addColorStop(0, '#5F7F7F');
+            bombGrad.addColorStop(0.5, '#3F5F5F');
+            bombGrad.addColorStop(1, '#2F4F4F');
+            ctx.fillStyle = bombGrad;
             ctx.beginPath();
-            ctx.ellipse(0, 0, 18, 12, 0, 0, Math.PI * 2);
+            ctx.ellipse(0, 0, 20, 14, 0, 0, Math.PI * 2);
             ctx.fill();
-            ctx.fillStyle = '#FF6347';
-            ctx.fillRect(-20, -4, 8, 8);
-            ctx.fillRect(12, -4, 8, 8);
+            ctx.strokeStyle = '#1F3F3F';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Wings
+            const wingGrad = ctx.createLinearGradient(-25, 0, -15, 0);
+            wingGrad.addColorStop(0, '#CC4030');
+            wingGrad.addColorStop(1, '#FF6347');
+            ctx.fillStyle = wingGrad;
+            ctx.fillRect(-25, -5, 10, 10);
+            ctx.strokeStyle = '#AA3020';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(-25, -5, 10, 10);
+
+            ctx.fillStyle = wingGrad;
+            ctx.fillRect(15, -5, 10, 10);
+            ctx.strokeRect(15, -5, 10, 10);
+
             // Cockpit
-            ctx.fillStyle = '#FFD700';
+            const cockGrad = ctx.createRadialGradient(-1, -5, 0, 0, -4, 7);
+            cockGrad.addColorStop(0, '#FFFF80');
+            cockGrad.addColorStop(0.5, '#FFD700');
+            cockGrad.addColorStop(1, '#CC9900');
+            ctx.fillStyle = cockGrad;
             ctx.beginPath();
-            ctx.arc(0, -4, 6, 0, Math.PI * 2);
+            ctx.arc(0, -4, 7, 0, Math.PI * 2);
             ctx.fill();
+            ctx.strokeStyle = '#996600';
+            ctx.stroke();
+
+            // Propellers
+            const propAngle = frameCount * 0.3;
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-20 + Math.cos(propAngle) * 6, 0);
+            ctx.lineTo(-20 - Math.cos(propAngle) * 6, 0);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(20 + Math.cos(propAngle) * 6, 0);
+            ctx.lineTo(20 - Math.cos(propAngle) * 6, 0);
+            ctx.stroke();
             break;
     }
 
@@ -495,43 +1100,205 @@ function drawGroundEnemy(enemy) {
     ctx.save();
     ctx.translate(enemy.x, enemy.y);
 
+    // 地上の敵は遠近法で小さく表示
+    const groundStartY = GAME_HEIGHT * 0.5;
+    const distanceFromTop = Math.max(0, (enemy.y - groundStartY) / (GAME_HEIGHT - groundStartY));
+    const scale = 0.5 + distanceFromTop * 0.3; // 0.5〜0.8のスケール
+    ctx.scale(scale, scale);
+
+    // ターゲットマーカー（地上敵の目印）
+    ctx.strokeStyle = 'rgba(255, 0, 0, 0.4)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, 30, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-35, 0);
+    ctx.lineTo(-20, 0);
+    ctx.moveTo(20, 0);
+    ctx.lineTo(35, 0);
+    ctx.moveTo(0, -35);
+    ctx.lineTo(0, -20);
+    ctx.moveTo(0, 20);
+    ctx.lineTo(0, 35);
+    ctx.stroke();
+
     switch (enemy.type) {
         case 'turret':
-            // Ground turret
-            ctx.fillStyle = '#556B2F';
-            ctx.fillRect(-12, -8, 24, 16);
-            ctx.fillStyle = '#8B4513';
+            // Ground turret - より詳細に
+            // Base shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
             ctx.beginPath();
-            ctx.arc(0, -8, 8, Math.PI, 0);
+            ctx.ellipse(0, 10, 14, 6, 0, 0, Math.PI * 2);
             ctx.fill();
+
+            // Base
+            const baseGrad = ctx.createLinearGradient(-12, -8, 12, 8);
+            baseGrad.addColorStop(0, '#7B8B3F');
+            baseGrad.addColorStop(0.5, '#556B2F');
+            baseGrad.addColorStop(1, '#3B4B1F');
+            ctx.fillStyle = baseGrad;
+            ctx.fillRect(-14, -8, 28, 18);
+            ctx.strokeStyle = '#2B3B0F';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(-14, -8, 28, 18);
+
+            // Dome
+            const domeGrad = ctx.createRadialGradient(-2, -10, 0, 0, -8, 10);
+            domeGrad.addColorStop(0, '#AB7543');
+            domeGrad.addColorStop(0.5, '#8B5533');
+            domeGrad.addColorStop(1, '#6B3513');
+            ctx.fillStyle = domeGrad;
+            ctx.beginPath();
+            ctx.arc(0, -8, 10, Math.PI, 0);
+            ctx.fill();
+            ctx.strokeStyle = '#4B2503';
+            ctx.stroke();
+
             // Cannon
-            ctx.fillStyle = '#333';
-            ctx.fillRect(-3, -16, 6, 10);
+            const cannonGrad = ctx.createLinearGradient(-4, 0, 4, 0);
+            cannonGrad.addColorStop(0, '#555');
+            cannonGrad.addColorStop(0.5, '#333');
+            cannonGrad.addColorStop(1, '#222');
+            ctx.fillStyle = cannonGrad;
+            ctx.fillRect(-4, -20, 8, 14);
+            ctx.strokeStyle = '#111';
+            ctx.strokeRect(-4, -20, 8, 14);
+
+            // Cannon tip
+            ctx.fillStyle = '#444';
+            ctx.fillRect(-5, -22, 10, 4);
             break;
 
         case 'tank':
-            // Moving tank
-            ctx.fillStyle = '#6B8E23';
-            ctx.fillRect(-14, -6, 28, 12);
-            ctx.fillStyle = '#556B2F';
-            ctx.fillRect(-10, -12, 20, 8);
+            // Moving tank - より詳細に
+            // Shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.beginPath();
+            ctx.ellipse(0, 12, 18, 6, 0, 0, Math.PI * 2);
+            ctx.fill();
+
             // Treads
+            const treadGrad = ctx.createLinearGradient(0, 4, 0, 10);
+            treadGrad.addColorStop(0, '#444');
+            treadGrad.addColorStop(0.5, '#222');
+            treadGrad.addColorStop(1, '#333');
+            ctx.fillStyle = treadGrad;
+            ctx.fillRect(-18, 2, 36, 8);
+
+            // Tread details
+            ctx.strokeStyle = '#555';
+            ctx.lineWidth = 1;
+            for (let i = -16; i < 18; i += 4) {
+                ctx.beginPath();
+                ctx.moveTo(i, 2);
+                ctx.lineTo(i, 10);
+                ctx.stroke();
+            }
+
+            // Main body
+            const tankGrad = ctx.createLinearGradient(-16, -8, 16, 4);
+            tankGrad.addColorStop(0, '#8BAE33');
+            tankGrad.addColorStop(0.5, '#6B8E23');
+            tankGrad.addColorStop(1, '#4B6E13');
+            ctx.fillStyle = tankGrad;
+            ctx.fillRect(-16, -6, 32, 10);
+            ctx.strokeStyle = '#3B5E03';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(-16, -6, 32, 10);
+
+            // Turret
+            const turretGrad = ctx.createRadialGradient(-2, -10, 0, 0, -8, 12);
+            turretGrad.addColorStop(0, '#7B9E33');
+            turretGrad.addColorStop(1, '#4B6E13');
+            ctx.fillStyle = turretGrad;
+            ctx.fillRect(-12, -14, 24, 10);
+            ctx.strokeStyle = '#3B5E03';
+            ctx.strokeRect(-12, -14, 24, 10);
+
+            // Cannon barrel
             ctx.fillStyle = '#333';
-            ctx.fillRect(-16, 4, 32, 4);
+            ctx.fillRect(-3, -22, 6, 10);
+            ctx.strokeStyle = '#111';
+            ctx.strokeRect(-3, -22, 6, 10);
             break;
 
         case 'building':
-            // Building/structure
-            ctx.fillStyle = '#8B4513';
-            ctx.fillRect(-16, -20, 32, 40);
+            // Building/structure - より詳細に
+            // Shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.beginPath();
+            ctx.moveTo(-18, 22);
+            ctx.lineTo(22, 22);
+            ctx.lineTo(22, 26);
+            ctx.lineTo(-18, 26);
+            ctx.closePath();
+            ctx.fill();
+
+            // Main building
+            const buildGrad = ctx.createLinearGradient(-18, 0, 18, 0);
+            buildGrad.addColorStop(0, '#AB7553');
+            buildGrad.addColorStop(0.3, '#8B5533');
+            buildGrad.addColorStop(0.7, '#8B5533');
+            buildGrad.addColorStop(1, '#6B3513');
+            ctx.fillStyle = buildGrad;
+            ctx.fillRect(-18, -22, 36, 44);
+            ctx.strokeStyle = '#4B2503';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-18, -22, 36, 44);
+
+            // Roof
             ctx.fillStyle = '#654321';
-            ctx.fillRect(-12, -16, 10, 10);
-            ctx.fillRect(2, -16, 10, 10);
-            ctx.fillRect(-12, 0, 10, 10);
-            ctx.fillRect(2, 0, 10, 10);
+            ctx.beginPath();
+            ctx.moveTo(-20, -22);
+            ctx.lineTo(0, -32);
+            ctx.lineTo(20, -22);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#4B2503';
+            ctx.stroke();
+
+            // Windows (4 windows)
+            const winGrad = ctx.createLinearGradient(0, 0, 0, 10);
+            winGrad.addColorStop(0, '#87CEEB');
+            winGrad.addColorStop(1, '#4682B4');
+            ctx.fillStyle = winGrad;
+            ctx.fillRect(-14, -16, 10, 12);
+            ctx.fillRect(4, -16, 10, 12);
+            ctx.fillRect(-14, 2, 10, 12);
+            ctx.fillRect(4, 2, 10, 12);
+
+            // Window frames
+            ctx.strokeStyle = '#654321';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(-14, -16, 10, 12);
+            ctx.strokeRect(4, -16, 10, 12);
+            ctx.strokeRect(-14, 2, 10, 12);
+            ctx.strokeRect(4, 2, 10, 12);
+
+            // Window cross
+            ctx.beginPath();
+            ctx.moveTo(-9, -16); ctx.lineTo(-9, -4);
+            ctx.moveTo(-14, -10); ctx.lineTo(-4, -10);
+            ctx.moveTo(9, -16); ctx.lineTo(9, -4);
+            ctx.moveTo(4, -10); ctx.lineTo(14, -10);
+            ctx.moveTo(-9, 2); ctx.lineTo(-9, 14);
+            ctx.moveTo(-14, 8); ctx.lineTo(-4, 8);
+            ctx.moveTo(9, 2); ctx.lineTo(9, 14);
+            ctx.moveTo(4, 8); ctx.lineTo(14, 8);
+            ctx.stroke();
+
+            // Door
+            ctx.fillStyle = '#4B2503';
+            ctx.fillRect(-5, 10, 10, 12);
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath();
+            ctx.arc(3, 16, 1.5, 0, Math.PI * 2);
+            ctx.fill();
             break;
     }
 
+    ctx.globalAlpha = 1;
     ctx.restore();
 }
 
@@ -593,37 +1360,248 @@ function drawPunch(x, y, direction) {
 }
 
 function drawBackground() {
-    // Sky gradient
-    const gradient = ctx.createLinearGradient(0, 0, 0, GAME_HEIGHT);
-    gradient.addColorStop(0, '#87CEEB');
-    gradient.addColorStop(0.7, '#98FB98');
-    gradient.addColorStop(1, '#228B22');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    // ===== 空のレイヤー（上層） =====
+    // 美しい空のグラデーション
+    const skyGradient = ctx.createLinearGradient(0, 0, 0, GAME_HEIGHT * 0.5);
+    skyGradient.addColorStop(0, '#1e90ff');    // 上部: 濃い青
+    skyGradient.addColorStop(0.3, '#87CEEB');  // 中: 明るい空色
+    skyGradient.addColorStop(0.7, '#B0E0E6');  // 下: 淡い水色
+    skyGradient.addColorStop(1, '#E0F6FF');    // 地平線付近: ほぼ白
+    ctx.fillStyle = skyGradient;
+    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT * 0.55);
 
-    // Scrolling ground pattern
-    const groundY = GAME_HEIGHT * 0.7;
-    ctx.fillStyle = '#228B22';
-    ctx.fillRect(0, groundY, GAME_WIDTH, GAME_HEIGHT - groundY);
-
-    // Ground details (fields, roads, etc.)
-    ctx.fillStyle = '#32CD32';
+    // 遠くの雲（背景装飾）
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
     for (let i = 0; i < 5; i++) {
-        const y = (groundY + 20 + i * 60 + scrollY * 0.5) % (GAME_HEIGHT * 0.5) + groundY;
-        ctx.fillRect(0, y, GAME_WIDTH, 30);
+        const cloudX = ((i * 80 + scrollY * 0.1) % (GAME_WIDTH + 60)) - 30;
+        const cloudY = 30 + i * 25;
+        drawBackgroundCloud(cloudX, cloudY, 0.5 + i * 0.1);
     }
 
-    // Rivers/paths
-    ctx.fillStyle = '#4169E1';
-    const riverY = (groundY + 100 + scrollY * 0.3) % 200 + groundY;
-    ctx.beginPath();
-    ctx.moveTo(0, riverY);
-    for (let x = 0; x <= GAME_WIDTH; x += 20) {
-        ctx.lineTo(x, riverY + Math.sin((x + scrollY) * 0.02) * 15);
+    // ===== 地上レイヤー（下層） =====
+    const groundStartY = GAME_HEIGHT * 0.5;
+
+    // 地上のメイングラデーション（遠近感）
+    const groundGradient = ctx.createLinearGradient(0, groundStartY, 0, GAME_HEIGHT);
+    groundGradient.addColorStop(0, '#90EE90');   // 遠く: 明るい緑
+    groundGradient.addColorStop(0.2, '#3CB371'); // 中距離
+    groundGradient.addColorStop(0.5, '#228B22'); // 近い
+    groundGradient.addColorStop(1, '#006400');   // 最前面: 濃い緑
+    ctx.fillStyle = groundGradient;
+    ctx.fillRect(0, groundStartY, GAME_WIDTH, GAME_HEIGHT - groundStartY);
+
+    // チェッカーボード風の畑パターン
+    const tileSize = 32;
+    const scrollOffset = (scrollY * 0.8) % tileSize;
+
+    for (let row = 0; row < 12; row++) {
+        const y = groundStartY + row * tileSize * 0.7 + scrollOffset * 0.7;
+        if (y < groundStartY - tileSize || y > GAME_HEIGHT) continue;
+
+        // 遠近法: 遠くは小さく、近くは大きく
+        const perspective = 0.5 + (row / 12) * 0.8;
+        const rowTileWidth = tileSize * perspective;
+        const rowOffset = (row % 2) * (rowTileWidth / 2);
+
+        for (let col = 0; col < Math.ceil(GAME_WIDTH / rowTileWidth) + 2; col++) {
+            const x = col * rowTileWidth + rowOffset - rowTileWidth;
+
+            // 交互に色を変える
+            if ((col + row) % 2 === 0) {
+                ctx.fillStyle = `rgba(50, 205, 50, ${0.3 + row * 0.05})`;
+            } else {
+                ctx.fillStyle = `rgba(34, 139, 34, ${0.3 + row * 0.05})`;
+            }
+            ctx.fillRect(x, y, rowTileWidth - 1, tileSize * 0.7 * perspective - 1);
+        }
     }
-    ctx.lineTo(GAME_WIDTH, riverY + 20);
-    ctx.lineTo(0, riverY + 20);
+
+    // 川（蛇行）
+    drawRiver(groundStartY);
+
+    // 道路
+    drawRoad(groundStartY);
+
+    // 森/木々のクラスター
+    drawTrees(groundStartY);
+
+    // 建物のシルエット（遠景）
+    drawDistantBuildings(groundStartY);
+
+    // 地上と空中の境界線（霞み効果）
+    const hazeGradient = ctx.createLinearGradient(0, groundStartY - 20, 0, groundStartY + 30);
+    hazeGradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
+    hazeGradient.addColorStop(0.5, 'rgba(200, 230, 200, 0.4)');
+    hazeGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = hazeGradient;
+    ctx.fillRect(0, groundStartY - 20, GAME_WIDTH, 50);
+}
+
+function drawBackgroundCloud(x, y, scale) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+    ctx.beginPath();
+    ctx.arc(0, 0, 20, 0, Math.PI * 2);
+    ctx.arc(25, 5, 25, 0, Math.PI * 2);
+    ctx.arc(50, 0, 20, 0, Math.PI * 2);
+    ctx.arc(15, -10, 15, 0, Math.PI * 2);
+    ctx.arc(35, -8, 18, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
+}
+
+function drawRiver(groundStartY) {
+    const riverY = groundStartY + 80 + ((scrollY * 0.5) % 150);
+
+    // 川の影
+    ctx.fillStyle = 'rgba(0, 50, 100, 0.3)';
+    ctx.beginPath();
+    ctx.moveTo(-10, riverY + 5);
+    for (let x = 0; x <= GAME_WIDTH + 20; x += 15) {
+        const wave = Math.sin((x + scrollY * 0.5) * 0.03) * 12;
+        ctx.lineTo(x, riverY + wave + 5);
+    }
+    ctx.lineTo(GAME_WIDTH + 10, riverY + 35);
+    ctx.lineTo(-10, riverY + 35);
+    ctx.closePath();
+    ctx.fill();
+
+    // 川本体
+    const riverGradient = ctx.createLinearGradient(0, riverY, 0, riverY + 25);
+    riverGradient.addColorStop(0, '#4169E1');
+    riverGradient.addColorStop(0.5, '#1E90FF');
+    riverGradient.addColorStop(1, '#4169E1');
+    ctx.fillStyle = riverGradient;
+
+    ctx.beginPath();
+    ctx.moveTo(-10, riverY);
+    for (let x = 0; x <= GAME_WIDTH + 20; x += 15) {
+        const wave = Math.sin((x + scrollY * 0.5) * 0.03) * 12;
+        ctx.lineTo(x, riverY + wave);
+    }
+    ctx.lineTo(GAME_WIDTH + 10, riverY + 25);
+    ctx.lineTo(-10, riverY + 25);
+    ctx.closePath();
+    ctx.fill();
+
+    // 水面のハイライト
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+        const waveX = ((scrollY * 2 + i * 100) % (GAME_WIDTH + 50)) - 25;
+        ctx.beginPath();
+        ctx.moveTo(waveX, riverY + 8 + i * 5);
+        ctx.lineTo(waveX + 20, riverY + 8 + i * 5);
+        ctx.stroke();
+    }
+}
+
+function drawRoad(groundStartY) {
+    const roadY = groundStartY + 180 + ((scrollY * 0.6) % 200);
+
+    // 道路の影
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    ctx.fillRect(-10, roadY + 3, GAME_WIDTH + 20, 24);
+
+    // 道路本体
+    ctx.fillStyle = '#8B7355';
+    ctx.fillRect(-10, roadY, GAME_WIDTH + 20, 20);
+
+    // 道路の境界線
+    ctx.fillStyle = '#6B5344';
+    ctx.fillRect(-10, roadY, GAME_WIDTH + 20, 3);
+    ctx.fillRect(-10, roadY + 17, GAME_WIDTH + 20, 3);
+
+    // 中央線（点線）
+    ctx.fillStyle = '#FFD700';
+    for (let x = -20 + ((scrollY * 2) % 40); x < GAME_WIDTH + 20; x += 40) {
+        ctx.fillRect(x, roadY + 9, 20, 2);
+    }
+}
+
+function drawTrees(groundStartY) {
+    // 木のクラスターを描画
+    const treePositions = [
+        { x: 20, offset: 0 },
+        { x: 80, offset: 50 },
+        { x: 150, offset: 100 },
+        { x: 220, offset: 30 },
+        { x: 280, offset: 80 }
+    ];
+
+    for (const tree of treePositions) {
+        const treeY = groundStartY + 40 + ((scrollY * 0.4 + tree.offset) % 120);
+        if (treeY > groundStartY + 20 && treeY < GAME_HEIGHT - 30) {
+            drawTree(tree.x, treeY);
+        }
+    }
+}
+
+function drawTree(x, y) {
+    ctx.save();
+    ctx.translate(x, y);
+
+    // 木の影
+    ctx.fillStyle = 'rgba(0, 50, 0, 0.3)';
+    ctx.beginPath();
+    ctx.ellipse(3, 12, 10, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 幹
+    ctx.fillStyle = '#8B4513';
+    ctx.fillRect(-3, 0, 6, 12);
+
+    // 葉（複数の円で）
+    ctx.fillStyle = '#228B22';
+    ctx.beginPath();
+    ctx.arc(0, -8, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#32CD32';
+    ctx.beginPath();
+    ctx.arc(-5, -5, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(5, -6, 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#3CB371';
+    ctx.beginPath();
+    ctx.arc(0, -12, 7, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ハイライト
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.beginPath();
+    ctx.arc(-3, -10, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+}
+
+function drawDistantBuildings(groundStartY) {
+    // 遠景の建物シルエット
+    const buildingData = [
+        { x: 50, width: 25, height: 30 },
+        { x: 130, width: 20, height: 25 },
+        { x: 200, width: 30, height: 35 },
+        { x: 270, width: 22, height: 28 }
+    ];
+
+    ctx.fillStyle = 'rgba(100, 120, 100, 0.3)';
+    for (const b of buildingData) {
+        const bY = groundStartY + 10 + ((scrollY * 0.2) % 60);
+        if (bY > groundStartY && bY < groundStartY + 50) {
+            ctx.fillRect(b.x, bY - b.height, b.width, b.height);
+            // 窓
+            ctx.fillStyle = 'rgba(255, 255, 200, 0.3)';
+            for (let wy = 0; wy < 3; wy++) {
+                for (let wx = 0; wx < 2; wx++) {
+                    ctx.fillRect(b.x + 4 + wx * 10, bY - b.height + 5 + wy * 8, 5, 4);
+                }
+            }
+            ctx.fillStyle = 'rgba(100, 120, 100, 0.3)';
+        }
+    }
 }
 
 // =====================================================
@@ -644,33 +1622,45 @@ function spawnCloud() {
 }
 
 function spawnAirEnemy() {
-    if (Math.random() < 0.015 + stage * 0.003) {
-        const types = ['bee', 'spinner', 'floater', 'bomber'];
+    // 序盤は敵の出現率を下げる
+    const spawnRate = 0.008 + stage * 0.004;
+    if (Math.random() < spawnRate) {
+        // 序盤はbomberを出さない
+        let types = ['bee', 'spinner', 'floater'];
+        if (stage >= 3) {
+            types.push('bomber');
+        }
         const type = types[Math.floor(Math.random() * types.length)];
 
         let health = 1;
         let points = 100;
         let shootInterval = 0;
 
+        // ステージに応じて弾の発射間隔を短くする（序盤は長め）
+        const difficultyMod = Math.max(1, 5 - stage * 0.5); // stage1=4.5, stage5=2.5, stage10=0
+
         switch (type) {
             case 'bee':
                 health = 1;
                 points = 100;
-                shootInterval = 120;
+                // 序盤: 540フレーム(9秒)ごと、後半: 120フレーム(2秒)ごと
+                shootInterval = Math.floor(120 * difficultyMod);
                 break;
             case 'spinner':
                 health = 2;
                 points = 200;
+                // spinnerは弾を撃たない
+                shootInterval = 0;
                 break;
             case 'floater':
                 health = 1;
                 points = 150;
-                shootInterval = 90;
+                shootInterval = Math.floor(90 * difficultyMod);
                 break;
             case 'bomber':
                 health = 4;
                 points = 500;
-                shootInterval = 60;
+                shootInterval = Math.floor(60 * difficultyMod);
                 break;
         }
 
@@ -692,7 +1682,7 @@ function spawnAirEnemy() {
 }
 
 function spawnGroundEnemy() {
-    if (Math.random() < 0.008 + stage * 0.002) {
+    if (Math.random() < 0.006 + stage * 0.002) {
         const types = ['turret', 'tank', 'building'];
         const type = types[Math.floor(Math.random() * types.length)];
 
@@ -714,15 +1704,20 @@ function spawnGroundEnemy() {
                 break;
         }
 
+        // 地上敵は画面下半分（地上エリア）の上端から出現
+        // 画面の50%〜55%の位置（地上エリアの開始地点付近）
+        const groundStartY = GAME_HEIGHT * 0.5;
+
         groundEnemies.push({
             x: Math.random() * (GAME_WIDTH - 40) + 20,
-            y: -30,
+            y: groundStartY - 40,  // 地上エリアの少し上から出現
             width: 32,
             height: 32,
             type,
             health,
             points,
-            vx: type === 'tank' ? (Math.random() - 0.5) * 1 : 0
+            vx: type === 'tank' ? (Math.random() - 0.5) * 1 : 0,
+            isGround: true  // 地上敵フラグ
         });
     }
 }
@@ -1215,8 +2210,23 @@ function draw() {
     // Draw background
     drawBackground();
 
-    // Draw ground enemies (behind player)
-    groundEnemies.forEach(e => drawGroundEnemy(e));
+    // Draw ground enemies (地上レイヤーに埋め込む感じ)
+    // 地上エリアの境界線を示す薄い線
+    const groundStartY = GAME_HEIGHT * 0.5;
+    ctx.strokeStyle = 'rgba(0, 100, 0, 0.3)';
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(0, groundStartY);
+    ctx.lineTo(GAME_WIDTH, groundStartY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 地上敵を描画（地上エリア内のみ表示）
+    groundEnemies.forEach(e => {
+        if (e.y >= groundStartY - 20) {
+            drawGroundEnemy(e);
+        }
+    });
 
     // Draw clouds
     clouds.forEach(c => drawCloud(c));
