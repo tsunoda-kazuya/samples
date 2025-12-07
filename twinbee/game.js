@@ -1894,9 +1894,11 @@ document.addEventListener('keyup', (e) => {
     }
 });
 
-// Touch controls - Analog joystick
+// Touch controls - Analog joystick (Safari compatible)
 let joystickActive = false;
 let joystickTouchId = null;
+let knobCenterX = 0;
+let knobCenterY = 0;
 
 function setupTouchControls() {
     const joystick = document.getElementById('joystick');
@@ -1904,11 +1906,18 @@ function setupTouchControls() {
     const btnShot = document.getElementById('btn-shot');
 
     if (!joystick || !knob) {
-        console.log('Joystick elements not found');
         return;
     }
 
-    const maxDistance = 40;
+    // ジョイスティックのサイズ (120px) とノブのサイズ (50px) から中心位置を計算
+    const joystickSize = 120;
+    const knobSize = 50;
+    const centerOffset = (joystickSize - knobSize) / 2; // 35px
+    const maxDistance = 35;
+
+    // 初期位置を設定
+    knob.style.left = centerOffset + 'px';
+    knob.style.top = centerOffset + 'px';
 
     function updateJoystick(touchX, touchY) {
         const rect = joystick.getBoundingClientRect();
@@ -1925,12 +1934,12 @@ function setupTouchControls() {
             dy = (dy / distance) * maxDistance;
         }
 
-        // Update knob position
-        knob.style.left = `calc(50% + ${dx}px)`;
-        knob.style.top = `calc(50% + ${dy}px)`;
+        // Update knob position (pixel values for Safari compatibility)
+        knob.style.left = (centerOffset + dx) + 'px';
+        knob.style.top = (centerOffset + dy) + 'px';
 
         // Update keys based on direction (with deadzone)
-        const deadzone = 8;
+        const deadzone = 10;
         keys.left = dx < -deadzone;
         keys.right = dx > deadzone;
         keys.up = dy < -deadzone;
@@ -1938,8 +1947,8 @@ function setupTouchControls() {
     }
 
     function resetJoystick() {
-        knob.style.left = '50%';
-        knob.style.top = '50%';
+        knob.style.left = centerOffset + 'px';
+        knob.style.top = centerOffset + 'px';
         keys.left = false;
         keys.right = false;
         keys.up = false;
@@ -1948,68 +1957,58 @@ function setupTouchControls() {
         joystickTouchId = null;
     }
 
-    // Use document-level touch events for better tracking
-    joystick.addEventListener('touchstart', (e) => {
+    // Touch start on joystick
+    joystick.addEventListener('touchstart', function(e) {
         e.preventDefault();
-        e.stopPropagation();
-        const touch = e.changedTouches[0];
-        joystickActive = true;
-        joystickTouchId = touch.identifier;
-        updateJoystick(touch.clientX, touch.clientY);
+        if (e.touches.length > 0) {
+            const touch = e.touches[0];
+            joystickActive = true;
+            joystickTouchId = touch.identifier;
+            updateJoystick(touch.clientX, touch.clientY);
+        }
     }, { passive: false });
 
-    document.addEventListener('touchmove', (e) => {
+    // Touch move - use joystick element for better Safari support
+    joystick.addEventListener('touchmove', function(e) {
+        e.preventDefault();
         if (!joystickActive) return;
 
-        for (let i = 0; i < e.changedTouches.length; i++) {
-            const touch = e.changedTouches[i];
-            if (touch.identifier === joystickTouchId) {
-                e.preventDefault();
-                updateJoystick(touch.clientX, touch.clientY);
+        for (let i = 0; i < e.touches.length; i++) {
+            if (e.touches[i].identifier === joystickTouchId) {
+                updateJoystick(e.touches[i].clientX, e.touches[i].clientY);
                 break;
             }
         }
     }, { passive: false });
 
-    document.addEventListener('touchend', (e) => {
-        for (let i = 0; i < e.changedTouches.length; i++) {
-            const touch = e.changedTouches[i];
-            if (touch.identifier === joystickTouchId) {
-                resetJoystick();
-                break;
-            }
-        }
-    });
+    // Touch end
+    joystick.addEventListener('touchend', function(e) {
+        e.preventDefault();
+        resetJoystick();
+    }, { passive: false });
 
-    document.addEventListener('touchcancel', (e) => {
-        for (let i = 0; i < e.changedTouches.length; i++) {
-            const touch = e.changedTouches[i];
-            if (touch.identifier === joystickTouchId) {
-                resetJoystick();
-                break;
-            }
-        }
-    });
+    joystick.addEventListener('touchcancel', function(e) {
+        resetJoystick();
+    }, { passive: false });
 
     // Shot button
     if (btnShot) {
-        btnShot.addEventListener('touchstart', (e) => {
+        btnShot.addEventListener('touchstart', function(e) {
             e.preventDefault();
-            e.stopPropagation();
             keys.shot = true;
             btnShot.classList.add('active');
         }, { passive: false });
 
-        btnShot.addEventListener('touchend', (e) => {
+        btnShot.addEventListener('touchend', function(e) {
             e.preventDefault();
             keys.shot = false;
             btnShot.classList.remove('active');
         }, { passive: false });
 
-        btnShot.addEventListener('touchcancel', (e) => {
+        btnShot.addEventListener('touchcancel', function(e) {
             keys.shot = false;
             btnShot.classList.remove('active');
-        });
+        }, { passive: false });
     }
 }
 
