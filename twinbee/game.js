@@ -1949,38 +1949,50 @@ function setupTouchControls() {
         joystickTouchId = null;
     }
 
-    // Touch start on joystick
+    // Touch start on joystick - changedTouchesを使って新しいタッチのみ取得
     joystick.addEventListener('touchstart', function(e) {
         e.preventDefault();
-        if (e.touches.length > 0) {
-            const touch = e.touches[0];
+        // このイベントで開始されたタッチのみを処理
+        if (e.changedTouches.length > 0 && joystickTouchId === null) {
+            const touch = e.changedTouches[0];
             joystickTouchId = touch.identifier;
             joystickActive = true;
             updateJoystick(touch.clientX, touch.clientY);
         }
     }, { passive: false });
 
-    // Touch move - use joystick element for better Safari support
+    // Touch move - ジョイスティックで開始されたタッチIDのみ追跡
     joystick.addEventListener('touchmove', function(e) {
         e.preventDefault();
-        if (!joystickActive) return;
+        if (!joystickActive || joystickTouchId === null) return;
 
-        for (let i = 0; i < e.touches.length; i++) {
-            if (e.touches[i].identifier === joystickTouchId) {
-                updateJoystick(e.touches[i].clientX, e.touches[i].clientY);
+        // changedTouchesから該当するタッチを探す
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            if (e.changedTouches[i].identifier === joystickTouchId) {
+                updateJoystick(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
                 break;
             }
         }
     }, { passive: false });
 
-    // Touch end
+    // Touch end - 該当するタッチが終了した場合のみリセット
     joystick.addEventListener('touchend', function(e) {
         e.preventDefault();
-        resetJoystick();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            if (e.changedTouches[i].identifier === joystickTouchId) {
+                resetJoystick();
+                break;
+            }
+        }
     }, { passive: false });
 
     joystick.addEventListener('touchcancel', function(e) {
-        resetJoystick();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            if (e.changedTouches[i].identifier === joystickTouchId) {
+                resetJoystick();
+                break;
+            }
+        }
     }, { passive: false });
 
     // Shot button
