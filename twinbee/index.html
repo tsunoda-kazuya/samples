@@ -222,7 +222,7 @@
             filter: brightness(1.3);
         }
         #btn-shot {
-            background: #e52521;
+            background: rgba(229, 37, 33, 0.6);
             right: 0;
             bottom: 0;
         }
@@ -268,14 +268,14 @@
         <canvas id="gameCanvas" width="320" height="480"></canvas>
         <div id="startScreen">
             <h1>TWINBEE</h1>
-            <p class="start-version">v3.2</p>
+            <p class="start-version">v3.3</p>
             <p>タップしてゲームスタート</p>
             <button onclick="startGame()">START GAME</button>
             <p>スマホは縦画面でプレイしてください</p>
         </div>
         <button id="soundToggle" onclick="toggleSound()">🔊</button>
         <button id="pauseBtn" onclick="togglePause()">PAUSE</button>
-        <div id="version">v3.2</div>
+        <div id="version">v3.3</div>
         <div id="ui">
             <span>SCORE <span id="score">000000</span></span>
             <span>STAGE <span id="stage">1</span></span>
@@ -297,7 +297,7 @@
             </div>
         </div>
     </div>
-    <script src="game.js?v=3.3"></script>
+    <script src="game.js?v=3.3.1"></script>
     <script>
         function resizeCanvas() {
             const canvas = document.getElementById('gameCanvas');

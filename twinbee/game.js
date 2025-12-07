@@ -1404,10 +1404,17 @@ function hitBell(bell) {
     bell.hitCount = (bell.hitCount || 0) + 1;
     bell.vy = -3; // Bounce up when hit
 
+    // 2周（30回ヒット）で壊れる
+    if (bell.hitCount >= 30) {
+        bell.destroyed = true;
+        createParticles(bell.x, bell.y, bell.color, 10);
+        return;
+    }
+
     // Change color every few hits
     if (bell.hitCount % 3 === 0) {
-        const currentIndex = BELL_EFFECTS.indexOf(bell.colorName);
-        const nextIndex = (currentIndex + 1) % BELL_EFFECTS.length;
+        var currentIndex = BELL_EFFECTS.indexOf(bell.colorName);
+        var nextIndex = (currentIndex + 1) % BELL_EFFECTS.length;
         bell.colorName = BELL_EFFECTS[nextIndex];
         bell.color = BELL_COLORS[bell.colorName];
     }
@@ -2017,15 +2024,10 @@ function update() {
         b.vy += 0.05; // Gravity
         b.vy = Math.min(b.vy, 2);
         b.y += b.vy;
-
-        // Bounce at bottom of screen
-        if (b.y > GAME_HEIGHT - 30) {
-            b.y = GAME_HEIGHT - 30;
-            b.vy = -2;
-        }
+        // 画面下に出たらそのまま消える（バウンスなし）
     });
-    // 画面下に出た鈴のみ消す（上に出ても残す）
-    bells = bells.filter(b => b.y < GAME_HEIGHT + 30);
+    // 画面下に出た鈴、壊れた鈴は消す
+    bells = bells.filter(b => b.y < GAME_HEIGHT + 30 && !b.destroyed);
 
     // Update air enemies
     airEnemies.forEach(enemy => {
