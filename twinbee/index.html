@@ -172,9 +172,9 @@
         #joystick {
             position: absolute;
             left: 15px;
-            bottom: 15px;
-            width: 150px;
-            height: 150px;
+            bottom: 50px;
+            width: 130px;
+            height: 130px;
             pointer-events: auto;
             background: rgba(255,255,255,0.2);
             border: 3px solid rgba(255,255,255,0.5);
@@ -183,8 +183,8 @@
         }
         #joystick-knob {
             position: absolute;
-            width: 60px;
-            height: 60px;
+            width: 55px;
+            height: 55px;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
@@ -197,9 +197,9 @@
         #actionButtons {
             position: absolute;
             right: 15px;
-            bottom: 15px;
-            width: 160px;
-            height: 160px;
+            bottom: 50px;
+            width: 130px;
+            height: 130px;
             pointer-events: auto;
         }
         .action-btn {
@@ -224,7 +224,7 @@
         #btn-shot {
             background: #e52521;
             right: 0;
-            bottom: 35px;
+            bottom: 0;
         }
         #btn-bomb {
             background: #3cbf00;
@@ -268,14 +268,14 @@
         <canvas id="gameCanvas" width="320" height="480"></canvas>
         <div id="startScreen">
             <h1>TWINBEE</h1>
-            <p class="start-version">v2.8</p>
+            <p class="start-version">v2.9</p>
             <p>タップしてゲームスタート</p>
             <button onclick="startGame()">START GAME</button>
             <p>スマホは縦画面でプレイしてください</p>
         </div>
         <button id="soundToggle" onclick="toggleSound()">🔊</button>
         <button id="pauseBtn" onclick="togglePause()">PAUSE</button>
-        <div id="version">v2.8</div>
+        <div id="version">v2.9</div>
         <div id="ui">
             <span>SCORE <span id="score">000000</span></span>
             <span>STAGE <span id="stage">1</span></span>
