@@ -1910,36 +1910,33 @@ function setupTouchControls() {
     }
 
     const maxDistance = 30;
-    let touchStartX = 0;
-    let touchStartY = 0;
 
     function updateJoystick(touchX, touchY) {
-        // タッチ開始位置からの相対移動で方向を決定
-        let dx = touchX - touchStartX;
-        let dy = touchY - touchStartY;
+        // ジョイスティックの中心座標を取得
+        const rect = joystick.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+
+        // 中心からのオフセット
+        let dx = touchX - centerX;
+        let dy = touchY - centerY;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
-        // Clamp to max distance
+        // 最大距離でクランプ
         if (distance > maxDistance) {
             dx = (dx / distance) * maxDistance;
             dy = (dy / distance) * maxDistance;
         }
 
-        // Update knob position using transform (CSS handles centering)
-        knob.style.transform = 'translate(calc(-50% + ' + dx + 'px), calc(-50% + ' + dy + 'px))';
+        // ノブの位置を更新（中心からのオフセット）
+        knob.style.transform = 'translate(' + (-50 + (dx / 25) * 50) + '%, ' + (-50 + (dy / 25) * 50) + '%)';
 
-        // Update keys based on direction (with deadzone)
-        const deadzone = 8;
+        // 方向キーの状態を更新（デッドゾーン付き）
+        const deadzone = 10;
         keys.left = dx < -deadzone;
         keys.right = dx > deadzone;
         keys.up = dy < -deadzone;
         keys.down = dy > deadzone;
-    }
-
-    function startJoystick(touchX, touchY) {
-        touchStartX = touchX;
-        touchStartY = touchY;
-        joystickActive = true;
     }
 
     function resetJoystick() {
@@ -1958,7 +1955,8 @@ function setupTouchControls() {
         if (e.touches.length > 0) {
             const touch = e.touches[0];
             joystickTouchId = touch.identifier;
-            startJoystick(touch.clientX, touch.clientY);
+            joystickActive = true;
+            updateJoystick(touch.clientX, touch.clientY);
         }
     }, { passive: false });
 
