@@ -1910,14 +1910,13 @@ function setupTouchControls() {
     }
 
     const maxDistance = 30;
+    let touchStartX = 0;
+    let touchStartY = 0;
 
     function updateJoystick(touchX, touchY) {
-        const rect = joystick.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-
-        let dx = touchX - centerX;
-        let dy = touchY - centerY;
+        // タッチ開始位置からの相対移動で方向を決定
+        let dx = touchX - touchStartX;
+        let dy = touchY - touchStartY;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
         // Clamp to max distance
@@ -1937,6 +1936,12 @@ function setupTouchControls() {
         keys.down = dy > deadzone;
     }
 
+    function startJoystick(touchX, touchY) {
+        touchStartX = touchX;
+        touchStartY = touchY;
+        joystickActive = true;
+    }
+
     function resetJoystick() {
         knob.style.transform = 'translate(-50%, -50%)';
         keys.left = false;
@@ -1952,9 +1957,8 @@ function setupTouchControls() {
         e.preventDefault();
         if (e.touches.length > 0) {
             const touch = e.touches[0];
-            joystickActive = true;
             joystickTouchId = touch.identifier;
-            updateJoystick(touch.clientX, touch.clientY);
+            startJoystick(touch.clientX, touch.clientY);
         }
     }, { passive: false });
 
