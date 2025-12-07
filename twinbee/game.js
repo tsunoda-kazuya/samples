@@ -1895,14 +1895,20 @@ document.addEventListener('keyup', (e) => {
 });
 
 // Touch controls - Analog joystick
+let joystickActive = false;
+let joystickTouchId = null;
+
 function setupTouchControls() {
     const joystick = document.getElementById('joystick');
     const knob = document.getElementById('joystick-knob');
     const btnShot = document.getElementById('btn-shot');
 
-    let joystickActive = false;
-    let joystickCenter = { x: 0, y: 0 };
-    const maxDistance = 35; // Maximum knob movement
+    if (!joystick || !knob) {
+        console.log('Joystick elements not found');
+        return;
+    }
+
+    const maxDistance = 40;
 
     function updateJoystick(touchX, touchY) {
         const rect = joystick.getBoundingClientRect();
@@ -1920,10 +1926,11 @@ function setupTouchControls() {
         }
 
         // Update knob position
-        knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+        knob.style.left = `calc(50% + ${dx}px)`;
+        knob.style.top = `calc(50% + ${dy}px)`;
 
         // Update keys based on direction (with deadzone)
-        const deadzone = 10;
+        const deadzone = 8;
         keys.left = dx < -deadzone;
         keys.right = dx > deadzone;
         keys.up = dy < -deadzone;
@@ -1931,53 +1938,74 @@ function setupTouchControls() {
     }
 
     function resetJoystick() {
-        knob.style.transform = 'translate(-50%, -50%)';
+        knob.style.left = '50%';
+        knob.style.top = '50%';
         keys.left = false;
         keys.right = false;
         keys.up = false;
         keys.down = false;
+        joystickActive = false;
+        joystickTouchId = null;
     }
 
-    if (joystick) {
-        joystick.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            joystickActive = true;
-            const touch = e.touches[0];
-            updateJoystick(touch.clientX, touch.clientY);
-        });
+    // Use document-level touch events for better tracking
+    joystick.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const touch = e.changedTouches[0];
+        joystickActive = true;
+        joystickTouchId = touch.identifier;
+        updateJoystick(touch.clientX, touch.clientY);
+    }, { passive: false });
 
-        joystick.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            if (joystickActive) {
-                const touch = e.touches[0];
+    document.addEventListener('touchmove', (e) => {
+        if (!joystickActive) return;
+
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            if (touch.identifier === joystickTouchId) {
+                e.preventDefault();
                 updateJoystick(touch.clientX, touch.clientY);
+                break;
             }
-        });
+        }
+    }, { passive: false });
 
-        joystick.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            joystickActive = false;
-            resetJoystick();
-        });
+    document.addEventListener('touchend', (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            if (touch.identifier === joystickTouchId) {
+                resetJoystick();
+                break;
+            }
+        }
+    });
 
-        joystick.addEventListener('touchcancel', (e) => {
-            joystickActive = false;
-            resetJoystick();
-        });
-    }
+    document.addEventListener('touchcancel', (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            if (touch.identifier === joystickTouchId) {
+                resetJoystick();
+                break;
+            }
+        }
+    });
 
     // Shot button
     if (btnShot) {
         btnShot.addEventListener('touchstart', (e) => {
             e.preventDefault();
+            e.stopPropagation();
             keys.shot = true;
             btnShot.classList.add('active');
-        });
+        }, { passive: false });
+
         btnShot.addEventListener('touchend', (e) => {
             e.preventDefault();
             keys.shot = false;
             btnShot.classList.remove('active');
-        });
+        }, { passive: false });
+
         btnShot.addEventListener('touchcancel', (e) => {
             keys.shot = false;
             btnShot.classList.remove('active');
