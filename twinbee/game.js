@@ -1729,7 +1729,9 @@ function checkBossCollision() {
     if (!boss) return;
 
     // プレイヤー弾 vs ボス
-    playerBullets.forEach(bullet => {
+    for (var i = 0; i < playerBullets.length; i++) {
+        if (!boss) break;  // ボスが倒されたらループ終了
+        var bullet = playerBullets[i];
         if (rectCollision(bullet, boss)) {
             bullet.hit = true;
             boss.health--;
@@ -1739,15 +1741,18 @@ function checkBossCollision() {
                 // ボス撃破
                 bossDefeated = true;
                 score += 5000 * stage;
-                createExplosion(boss.x, boss.y, 60);
-                createExplosion(boss.x - 20, boss.y - 10, 40);
-                createExplosion(boss.x + 20, boss.y + 10, 40);
+                var bx = boss.x;
+                var by = boss.y;
+                createExplosion(bx, by, 60);
+                createExplosion(bx - 20, by - 10, 40);
+                createExplosion(bx + 20, by + 10, 40);
                 playExplosion();
                 boss = null;
                 stageClearTimer = 120; // 2秒後にステージクリア
+                break;
             }
         }
-    });
+    }
 
     // プレイヤー vs ボス（体当たり）
     if (boss && rectCollision(player, boss)) {
@@ -1762,39 +1767,54 @@ function drawBoss() {
     ctx.translate(boss.x, boss.y);
 
     // ボスの体（ステージで色が変わる）
-    const bossColors = ['#8B0000', '#4B0082', '#006400', '#8B4513', '#2F4F4F'];
-    const bodyColor = bossColors[(boss.type - 1) % bossColors.length];
+    var bossColors = ['#8B0000', '#4B0082', '#006400', '#8B4513', '#2F4F4F'];
+    var bodyColor = bossColors[(boss.type - 1) % bossColors.length];
 
-    // 影
+    // 影（ellipseの代わりにscale+arcを使用）
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.save();
+    ctx.translate(5, 40);
+    ctx.scale(35/15, 1);
     ctx.beginPath();
-    ctx.ellipse(5, 40, 35, 15, 0, 0, Math.PI * 2);
+    ctx.arc(0, 0, 15, 0, Math.PI * 2);
+    ctx.restore();
     ctx.fill();
 
     // メインボディ
-    const bodyGrad = ctx.createRadialGradient(-10, -10, 0, 0, 0, 50);
+    var bodyGrad = ctx.createRadialGradient(-10, -10, 0, 0, 0, 50);
     bodyGrad.addColorStop(0, '#666');
     bodyGrad.addColorStop(0.5, bodyColor);
     bodyGrad.addColorStop(1, '#000');
     ctx.fillStyle = bodyGrad;
 
+    ctx.save();
+    ctx.scale(40/30, 1);
     ctx.beginPath();
-    ctx.ellipse(0, 0, 40, 30, 0, 0, Math.PI * 2);
+    ctx.arc(0, 0, 30, 0, Math.PI * 2);
+    ctx.restore();
     ctx.fill();
 
     // キャノピー（コクピット）
     ctx.fillStyle = '#333';
+    ctx.save();
+    ctx.translate(0, -5);
+    ctx.scale(20/15, 1);
     ctx.beginPath();
-    ctx.ellipse(0, -5, 20, 15, 0, 0, Math.PI * 2);
+    ctx.arc(0, 0, 15, 0, Math.PI * 2);
+    ctx.restore();
     ctx.fill();
 
-    const canopyGrad = ctx.createRadialGradient(-5, -10, 0, 0, -5, 15);
+    var canopyGrad = ctx.createRadialGradient(-5, -10, 0, 0, -5, 15);
     canopyGrad.addColorStop(0, '#87CEEB');
     canopyGrad.addColorStop(0.5, '#4169E1');
     canopyGrad.addColorStop(1, '#000080');
     ctx.fillStyle = canopyGrad;
+    ctx.save();
+    ctx.translate(0, -5);
+    ctx.scale(15/10, 1);
     ctx.beginPath();
-    ctx.ellipse(0, -5, 15, 10, 0, 0, Math.PI * 2);
+    ctx.arc(0, 0, 10, 0, Math.PI * 2);
+    ctx.restore();
     ctx.fill();
 
     // 左右のウイング
@@ -1822,7 +1842,7 @@ function drawBoss() {
     ctx.fill();
 
     // ダメージエフェクト
-    const healthRatio = boss.health / boss.maxHealth;
+    var healthRatio = boss.health / boss.maxHealth;
     if (healthRatio < 0.5) {
         // 煙
         if (frameCount % 10 < 5) {
@@ -1845,10 +1865,10 @@ function drawBoss() {
     ctx.restore();
 
     // HPバー
-    const barWidth = 100;
-    const barHeight = 8;
-    const barX = GAME_WIDTH / 2 - barWidth / 2;
-    const barY = 25;
+    var barWidth = 100;
+    var barHeight = 8;
+    var barX = GAME_WIDTH / 2 - barWidth / 2;
+    var barY = 25;
 
     ctx.fillStyle = '#333';
     ctx.fillRect(barX - 2, barY - 2, barWidth + 4, barHeight + 4);
