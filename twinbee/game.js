@@ -1894,40 +1894,95 @@ document.addEventListener('keyup', (e) => {
     }
 });
 
-// Touch controls
+// Touch controls - Analog joystick
 function setupTouchControls() {
-    const dpadUp = document.getElementById('dpad-up');
-    const dpadDown = document.getElementById('dpad-down');
-    const dpadLeft = document.getElementById('dpad-left');
-    const dpadRight = document.getElementById('dpad-right');
+    const joystick = document.getElementById('joystick');
+    const knob = document.getElementById('joystick-knob');
     const btnShot = document.getElementById('btn-shot');
-    const btnBomb = document.getElementById('btn-bomb');
 
-    const handleTouch = (element, key, isDown) => {
-        if (element) {
-            element.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                keys[key] = true;
-                element.classList.add('active');
-            });
-            element.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                keys[key] = false;
-                element.classList.remove('active');
-            });
-            element.addEventListener('touchcancel', (e) => {
-                keys[key] = false;
-                element.classList.remove('active');
-            });
+    let joystickActive = false;
+    let joystickCenter = { x: 0, y: 0 };
+    const maxDistance = 35; // Maximum knob movement
+
+    function updateJoystick(touchX, touchY) {
+        const rect = joystick.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+
+        let dx = touchX - centerX;
+        let dy = touchY - centerY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        // Clamp to max distance
+        if (distance > maxDistance) {
+            dx = (dx / distance) * maxDistance;
+            dy = (dy / distance) * maxDistance;
         }
-    };
 
-    handleTouch(dpadUp, 'up');
-    handleTouch(dpadDown, 'down');
-    handleTouch(dpadLeft, 'left');
-    handleTouch(dpadRight, 'right');
-    handleTouch(btnShot, 'shot');
-    handleTouch(btnBomb, 'bomb');
+        // Update knob position
+        knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+
+        // Update keys based on direction (with deadzone)
+        const deadzone = 10;
+        keys.left = dx < -deadzone;
+        keys.right = dx > deadzone;
+        keys.up = dy < -deadzone;
+        keys.down = dy > deadzone;
+    }
+
+    function resetJoystick() {
+        knob.style.transform = 'translate(-50%, -50%)';
+        keys.left = false;
+        keys.right = false;
+        keys.up = false;
+        keys.down = false;
+    }
+
+    if (joystick) {
+        joystick.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            joystickActive = true;
+            const touch = e.touches[0];
+            updateJoystick(touch.clientX, touch.clientY);
+        });
+
+        joystick.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (joystickActive) {
+                const touch = e.touches[0];
+                updateJoystick(touch.clientX, touch.clientY);
+            }
+        });
+
+        joystick.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            joystickActive = false;
+            resetJoystick();
+        });
+
+        joystick.addEventListener('touchcancel', (e) => {
+            joystickActive = false;
+            resetJoystick();
+        });
+    }
+
+    // Shot button
+    if (btnShot) {
+        btnShot.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            keys.shot = true;
+            btnShot.classList.add('active');
+        });
+        btnShot.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            keys.shot = false;
+            btnShot.classList.remove('active');
+        });
+        btnShot.addEventListener('touchcancel', (e) => {
+            keys.shot = false;
+            btnShot.classList.remove('active');
+        });
+    }
 }
 
 // Initialize

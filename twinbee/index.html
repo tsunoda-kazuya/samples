@@ -164,41 +164,29 @@
                 display: block;
             }
         }
-        #dpad {
+        #joystick {
             position: absolute;
-            left: 15px;
-            bottom: 15px;
-            width: 150px;
-            height: 150px;
+            left: 20px;
+            bottom: 20px;
+            width: 120px;
+            height: 120px;
             pointer-events: auto;
+            background: rgba(255,255,255,0.2);
+            border: 3px solid rgba(255,255,255,0.5);
+            border-radius: 50%;
+            touch-action: none;
         }
-        .dpad-btn {
+        #joystick-knob {
             position: absolute;
             width: 50px;
             height: 50px;
-            background: rgba(255,255,255,0.4);
-            border: 3px solid rgba(255,255,255,0.7);
-            border-radius: 10px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 28px;
-            color: white;
-            touch-action: manipulation;
-            text-shadow: 1px 1px 2px #000;
-        }
-        .dpad-btn:active, .dpad-btn.active {
-            background: rgba(255,255,255,0.7);
-        }
-        #dpad-up { top: 0; left: 50px; }
-        #dpad-down { bottom: 0; left: 50px; }
-        #dpad-left { top: 50px; left: 0; }
-        #dpad-right { top: 50px; right: 0; }
-        #dpad-center {
-            top: 50px;
-            left: 50px;
-            background: rgba(100,100,100,0.3);
-            border: none;
+            background: rgba(255,255,255,0.6);
+            border: 3px solid rgba(255,255,255,0.8);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
         }
         #actionButtons {
             position: absolute;
@@ -280,7 +268,7 @@
         </div>
         <button id="soundToggle" onclick="toggleSound()">🔊</button>
         <button id="pauseBtn" onclick="togglePause()">PAUSE</button>
-        <div id="version">v1.7</div>
+        <div id="version">v1.8</div>
         <div id="ui">
             <span>SCORE <span id="score">000000</span></span>
             <span>STAGE <span id="stage">1</span></span>
@@ -294,12 +282,8 @@
             ←→↑↓: 移動 | Z/スペース: ショット
         </div>
         <div id="touchControls">
-            <div id="dpad">
-                <div id="dpad-up" class="dpad-btn">▲</div>
-                <div id="dpad-down" class="dpad-btn">▼</div>
-                <div id="dpad-left" class="dpad-btn">◀</div>
-                <div id="dpad-right" class="dpad-btn">▶</div>
-                <div id="dpad-center" class="dpad-btn"></div>
+            <div id="joystick">
+                <div id="joystick-knob"></div>
             </div>
             <div id="actionButtons">
                 <div id="btn-shot" class="action-btn">SHOT</div>
