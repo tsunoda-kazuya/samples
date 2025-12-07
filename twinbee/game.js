@@ -1909,15 +1909,28 @@ function setupTouchControls() {
         return;
     }
 
-    // ジョイスティックのサイズ (120px) とノブのサイズ (50px) から中心位置を計算
-    const joystickSize = 120;
-    const knobSize = 50;
-    const centerOffset = (joystickSize - knobSize) / 2; // 35px
-    const maxDistance = 35;
+    // ノブを中央に配置するためのオフセットを動的に計算
+    const maxDistance = 30;
+
+    function getCenterOffset() {
+        // ジョイスティックの内部サイズ（borderを除く）とノブのサイズから計算
+        const joystickRect = joystick.getBoundingClientRect();
+        const knobRect = knob.getBoundingClientRect();
+        // content幅を取得（border除く）
+        const joystickInnerWidth = joystick.clientWidth;
+        const joystickInnerHeight = joystick.clientHeight;
+        const knobWidth = knob.offsetWidth;
+        const knobHeight = knob.offsetHeight;
+        return {
+            x: (joystickInnerWidth - knobWidth) / 2,
+            y: (joystickInnerHeight - knobHeight) / 2
+        };
+    }
 
     // 初期位置を設定
-    knob.style.left = centerOffset + 'px';
-    knob.style.top = centerOffset + 'px';
+    const initialOffset = getCenterOffset();
+    knob.style.left = initialOffset.x + 'px';
+    knob.style.top = initialOffset.y + 'px';
 
     function updateJoystick(touchX, touchY) {
         const rect = joystick.getBoundingClientRect();
@@ -1934,12 +1947,13 @@ function setupTouchControls() {
             dy = (dy / distance) * maxDistance;
         }
 
-        // Update knob position (pixel values for Safari compatibility)
-        knob.style.left = (centerOffset + dx) + 'px';
-        knob.style.top = (centerOffset + dy) + 'px';
+        // Update knob position
+        const offset = getCenterOffset();
+        knob.style.left = (offset.x + dx) + 'px';
+        knob.style.top = (offset.y + dy) + 'px';
 
         // Update keys based on direction (with deadzone)
-        const deadzone = 10;
+        const deadzone = 8;
         keys.left = dx < -deadzone;
         keys.right = dx > deadzone;
         keys.up = dy < -deadzone;
@@ -1947,8 +1961,9 @@ function setupTouchControls() {
     }
 
     function resetJoystick() {
-        knob.style.left = centerOffset + 'px';
-        knob.style.top = centerOffset + 'px';
+        const offset = getCenterOffset();
+        knob.style.left = offset.x + 'px';
+        knob.style.top = offset.y + 'px';
         keys.left = false;
         keys.right = false;
         keys.up = false;
