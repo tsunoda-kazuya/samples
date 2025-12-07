@@ -37,8 +37,7 @@ const player = {
     options: [],       // trailing options
     armLeft: true,     // arms can be shot off
     armRight: true,
-    invincible: 0,
-    punchCooldown: 0
+    invincible: 0
 };
 
 // Bullets
@@ -51,10 +50,6 @@ let clouds = [];
 
 // Enemies
 let airEnemies = [];
-let groundEnemies = [];
-
-// Ground objects
-let groundTiles = [];
 
 // Effects
 let explosions = [];
@@ -790,21 +785,15 @@ function drawCloud(cloud) {
     ctx.ellipse(3, 25, 20, 8, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Cloud gradient
+    // Cloud gradient（明るい白い雲）
     const cloudGrad = ctx.createRadialGradient(0, -5, 0, 0, 5, 30);
-    if (cloud.hasBell) {
-        cloudGrad.addColorStop(0, '#FFFFFF');
-        cloudGrad.addColorStop(0.5, '#F5F5F5');
-        cloudGrad.addColorStop(1, '#E0E0E0');
-    } else {
-        cloudGrad.addColorStop(0, '#F0F0F0');
-        cloudGrad.addColorStop(0.5, '#D8D8D8');
-        cloudGrad.addColorStop(1, '#C0C0C0');
-    }
+    cloudGrad.addColorStop(0, '#FFFFFF');
+    cloudGrad.addColorStop(0.5, '#F5F5F5');
+    cloudGrad.addColorStop(1, '#E0E0E0');
 
     ctx.fillStyle = cloudGrad;
 
-    // Fluffy cloud shape - より立体的に
+    // Fluffy cloud shape
     ctx.beginPath();
     ctx.arc(-15, 2, 14, 0, Math.PI * 2);
     ctx.arc(0, -6, 16, 0, Math.PI * 2);
@@ -827,11 +816,11 @@ function drawCloud(cloud) {
     ctx.ellipse(0, 12, 22, 6, 0, 0, Math.PI);
     ctx.fill();
 
-    // ベルがある場合のキラキラ
-    if (cloud.hasBell && frameCount % 30 < 15) {
-        ctx.fillStyle = 'rgba(255, 255, 100, 0.7)';
+    // 鈴がある場合はキラキラエフェクト
+    if (cloud.hasBell && frameCount % 20 < 10) {
+        ctx.fillStyle = 'rgba(255, 255, 100, 0.8)';
         ctx.beginPath();
-        ctx.arc(0, 0, 3, 0, Math.PI * 2);
+        ctx.arc(0, 0, 4, 0, Math.PI * 2);
         ctx.fill();
     }
 
@@ -1096,212 +1085,6 @@ function drawAirEnemy(enemy) {
     ctx.restore();
 }
 
-function drawGroundEnemy(enemy) {
-    ctx.save();
-    ctx.translate(enemy.x, enemy.y);
-
-    // 地上の敵は遠近法で小さく表示
-    const groundStartY = GAME_HEIGHT * 0.5;
-    const distanceFromTop = Math.max(0, (enemy.y - groundStartY) / (GAME_HEIGHT - groundStartY));
-    const scale = 0.5 + distanceFromTop * 0.3; // 0.5〜0.8のスケール
-    ctx.scale(scale, scale);
-
-    // ターゲットマーカー（地上敵の目印）
-    ctx.strokeStyle = 'rgba(255, 0, 0, 0.4)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(0, 0, 30, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(-35, 0);
-    ctx.lineTo(-20, 0);
-    ctx.moveTo(20, 0);
-    ctx.lineTo(35, 0);
-    ctx.moveTo(0, -35);
-    ctx.lineTo(0, -20);
-    ctx.moveTo(0, 20);
-    ctx.lineTo(0, 35);
-    ctx.stroke();
-
-    switch (enemy.type) {
-        case 'turret':
-            // Ground turret - より詳細に
-            // Base shadow
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-            ctx.beginPath();
-            ctx.ellipse(0, 10, 14, 6, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Base
-            const baseGrad = ctx.createLinearGradient(-12, -8, 12, 8);
-            baseGrad.addColorStop(0, '#7B8B3F');
-            baseGrad.addColorStop(0.5, '#556B2F');
-            baseGrad.addColorStop(1, '#3B4B1F');
-            ctx.fillStyle = baseGrad;
-            ctx.fillRect(-14, -8, 28, 18);
-            ctx.strokeStyle = '#2B3B0F';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(-14, -8, 28, 18);
-
-            // Dome
-            const domeGrad = ctx.createRadialGradient(-2, -10, 0, 0, -8, 10);
-            domeGrad.addColorStop(0, '#AB7543');
-            domeGrad.addColorStop(0.5, '#8B5533');
-            domeGrad.addColorStop(1, '#6B3513');
-            ctx.fillStyle = domeGrad;
-            ctx.beginPath();
-            ctx.arc(0, -8, 10, Math.PI, 0);
-            ctx.fill();
-            ctx.strokeStyle = '#4B2503';
-            ctx.stroke();
-
-            // Cannon
-            const cannonGrad = ctx.createLinearGradient(-4, 0, 4, 0);
-            cannonGrad.addColorStop(0, '#555');
-            cannonGrad.addColorStop(0.5, '#333');
-            cannonGrad.addColorStop(1, '#222');
-            ctx.fillStyle = cannonGrad;
-            ctx.fillRect(-4, -20, 8, 14);
-            ctx.strokeStyle = '#111';
-            ctx.strokeRect(-4, -20, 8, 14);
-
-            // Cannon tip
-            ctx.fillStyle = '#444';
-            ctx.fillRect(-5, -22, 10, 4);
-            break;
-
-        case 'tank':
-            // Moving tank - より詳細に
-            // Shadow
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-            ctx.beginPath();
-            ctx.ellipse(0, 12, 18, 6, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Treads
-            const treadGrad = ctx.createLinearGradient(0, 4, 0, 10);
-            treadGrad.addColorStop(0, '#444');
-            treadGrad.addColorStop(0.5, '#222');
-            treadGrad.addColorStop(1, '#333');
-            ctx.fillStyle = treadGrad;
-            ctx.fillRect(-18, 2, 36, 8);
-
-            // Tread details
-            ctx.strokeStyle = '#555';
-            ctx.lineWidth = 1;
-            for (let i = -16; i < 18; i += 4) {
-                ctx.beginPath();
-                ctx.moveTo(i, 2);
-                ctx.lineTo(i, 10);
-                ctx.stroke();
-            }
-
-            // Main body
-            const tankGrad = ctx.createLinearGradient(-16, -8, 16, 4);
-            tankGrad.addColorStop(0, '#8BAE33');
-            tankGrad.addColorStop(0.5, '#6B8E23');
-            tankGrad.addColorStop(1, '#4B6E13');
-            ctx.fillStyle = tankGrad;
-            ctx.fillRect(-16, -6, 32, 10);
-            ctx.strokeStyle = '#3B5E03';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(-16, -6, 32, 10);
-
-            // Turret
-            const turretGrad = ctx.createRadialGradient(-2, -10, 0, 0, -8, 12);
-            turretGrad.addColorStop(0, '#7B9E33');
-            turretGrad.addColorStop(1, '#4B6E13');
-            ctx.fillStyle = turretGrad;
-            ctx.fillRect(-12, -14, 24, 10);
-            ctx.strokeStyle = '#3B5E03';
-            ctx.strokeRect(-12, -14, 24, 10);
-
-            // Cannon barrel
-            ctx.fillStyle = '#333';
-            ctx.fillRect(-3, -22, 6, 10);
-            ctx.strokeStyle = '#111';
-            ctx.strokeRect(-3, -22, 6, 10);
-            break;
-
-        case 'building':
-            // Building/structure - より詳細に
-            // Shadow
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-            ctx.beginPath();
-            ctx.moveTo(-18, 22);
-            ctx.lineTo(22, 22);
-            ctx.lineTo(22, 26);
-            ctx.lineTo(-18, 26);
-            ctx.closePath();
-            ctx.fill();
-
-            // Main building
-            const buildGrad = ctx.createLinearGradient(-18, 0, 18, 0);
-            buildGrad.addColorStop(0, '#AB7553');
-            buildGrad.addColorStop(0.3, '#8B5533');
-            buildGrad.addColorStop(0.7, '#8B5533');
-            buildGrad.addColorStop(1, '#6B3513');
-            ctx.fillStyle = buildGrad;
-            ctx.fillRect(-18, -22, 36, 44);
-            ctx.strokeStyle = '#4B2503';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(-18, -22, 36, 44);
-
-            // Roof
-            ctx.fillStyle = '#654321';
-            ctx.beginPath();
-            ctx.moveTo(-20, -22);
-            ctx.lineTo(0, -32);
-            ctx.lineTo(20, -22);
-            ctx.closePath();
-            ctx.fill();
-            ctx.strokeStyle = '#4B2503';
-            ctx.stroke();
-
-            // Windows (4 windows)
-            const winGrad = ctx.createLinearGradient(0, 0, 0, 10);
-            winGrad.addColorStop(0, '#87CEEB');
-            winGrad.addColorStop(1, '#4682B4');
-            ctx.fillStyle = winGrad;
-            ctx.fillRect(-14, -16, 10, 12);
-            ctx.fillRect(4, -16, 10, 12);
-            ctx.fillRect(-14, 2, 10, 12);
-            ctx.fillRect(4, 2, 10, 12);
-
-            // Window frames
-            ctx.strokeStyle = '#654321';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(-14, -16, 10, 12);
-            ctx.strokeRect(4, -16, 10, 12);
-            ctx.strokeRect(-14, 2, 10, 12);
-            ctx.strokeRect(4, 2, 10, 12);
-
-            // Window cross
-            ctx.beginPath();
-            ctx.moveTo(-9, -16); ctx.lineTo(-9, -4);
-            ctx.moveTo(-14, -10); ctx.lineTo(-4, -10);
-            ctx.moveTo(9, -16); ctx.lineTo(9, -4);
-            ctx.moveTo(4, -10); ctx.lineTo(14, -10);
-            ctx.moveTo(-9, 2); ctx.lineTo(-9, 14);
-            ctx.moveTo(-14, 8); ctx.lineTo(-4, 8);
-            ctx.moveTo(9, 2); ctx.lineTo(9, 14);
-            ctx.moveTo(4, 8); ctx.lineTo(14, 8);
-            ctx.stroke();
-
-            // Door
-            ctx.fillStyle = '#4B2503';
-            ctx.fillRect(-5, 10, 10, 12);
-            ctx.fillStyle = '#FFD700';
-            ctx.beginPath();
-            ctx.arc(3, 16, 1.5, 0, Math.PI * 2);
-            ctx.fill();
-            break;
-    }
-
-    ctx.globalAlpha = 1;
-    ctx.restore();
-}
-
 function drawExplosion(exp) {
     ctx.save();
     ctx.translate(exp.x, exp.y);
@@ -1340,101 +1123,66 @@ function drawParticle(p) {
     ctx.globalAlpha = 1;
 }
 
-function drawPunch(x, y, direction) {
-    ctx.save();
-    ctx.translate(x, y);
-
-    // Punch wave effect
-    ctx.strokeStyle = '#FF6B6B';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(0, 20 + direction * 10, 15, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.strokeStyle = 'rgba(255, 107, 107, 0.5)';
-    ctx.beginPath();
-    ctx.arc(0, 20 + direction * 15, 20, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.restore();
-}
-
 function drawBackground() {
-    // ===== 空のレイヤー（上層） =====
-    // 美しい空のグラデーション
-    const skyGradient = ctx.createLinearGradient(0, 0, 0, GAME_HEIGHT * 0.5);
-    skyGradient.addColorStop(0, '#1e90ff');    // 上部: 濃い青
-    skyGradient.addColorStop(0.3, '#87CEEB');  // 中: 明るい空色
+    // ===== 全画面が空 =====
+    // 美しい空のグラデーション（上から下へ）
+    const skyGradient = ctx.createLinearGradient(0, 0, 0, GAME_HEIGHT);
+    skyGradient.addColorStop(0, '#0066CC');    // 上部: 濃い青
+    skyGradient.addColorStop(0.3, '#1E90FF');  //
+    skyGradient.addColorStop(0.5, '#87CEEB');  // 中: 明るい空色
     skyGradient.addColorStop(0.7, '#B0E0E6');  // 下: 淡い水色
-    skyGradient.addColorStop(1, '#E0F6FF');    // 地平線付近: ほぼ白
+    skyGradient.addColorStop(1, '#E0F6FF');    // 最下部: ほぼ白
     ctx.fillStyle = skyGradient;
-    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT * 0.55);
+    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-    // 遠くの雲（背景装飾）
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    // 背景の雲（複数レイヤーで奥行き感）
+    // 遠くの雲（小さく、ゆっくり）
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    for (let i = 0; i < 4; i++) {
+        const cloudX = ((i * 100 + scrollY * 0.05) % (GAME_WIDTH + 80)) - 40;
+        const cloudY = 50 + i * 40;
+        drawBackgroundCloud(cloudX, cloudY, 0.4);
+    }
+
+    // 中間の雲
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
     for (let i = 0; i < 5; i++) {
-        const cloudX = ((i * 80 + scrollY * 0.1) % (GAME_WIDTH + 60)) - 30;
-        const cloudY = 30 + i * 25;
-        drawBackgroundCloud(cloudX, cloudY, 0.5 + i * 0.1);
+        const cloudX = ((i * 80 + scrollY * 0.1 + 30) % (GAME_WIDTH + 100)) - 50;
+        const cloudY = 120 + i * 60;
+        drawBackgroundCloud(cloudX, cloudY, 0.6);
     }
 
-    // ===== 地上レイヤー（下層） =====
-    const groundStartY = GAME_HEIGHT * 0.5;
-
-    // 地上のメイングラデーション（遠近感）
-    const groundGradient = ctx.createLinearGradient(0, groundStartY, 0, GAME_HEIGHT);
-    groundGradient.addColorStop(0, '#90EE90');   // 遠く: 明るい緑
-    groundGradient.addColorStop(0.2, '#3CB371'); // 中距離
-    groundGradient.addColorStop(0.5, '#228B22'); // 近い
-    groundGradient.addColorStop(1, '#006400');   // 最前面: 濃い緑
-    ctx.fillStyle = groundGradient;
-    ctx.fillRect(0, groundStartY, GAME_WIDTH, GAME_HEIGHT - groundStartY);
-
-    // チェッカーボード風の畑パターン
-    const tileSize = 32;
-    const scrollOffset = (scrollY * 0.8) % tileSize;
-
-    for (let row = 0; row < 12; row++) {
-        const y = groundStartY + row * tileSize * 0.7 + scrollOffset * 0.7;
-        if (y < groundStartY - tileSize || y > GAME_HEIGHT) continue;
-
-        // 遠近法: 遠くは小さく、近くは大きく
-        const perspective = 0.5 + (row / 12) * 0.8;
-        const rowTileWidth = tileSize * perspective;
-        const rowOffset = (row % 2) * (rowTileWidth / 2);
-
-        for (let col = 0; col < Math.ceil(GAME_WIDTH / rowTileWidth) + 2; col++) {
-            const x = col * rowTileWidth + rowOffset - rowTileWidth;
-
-            // 交互に色を変える
-            if ((col + row) % 2 === 0) {
-                ctx.fillStyle = `rgba(50, 205, 50, ${0.3 + row * 0.05})`;
-            } else {
-                ctx.fillStyle = `rgba(34, 139, 34, ${0.3 + row * 0.05})`;
-            }
-            ctx.fillRect(x, y, rowTileWidth - 1, tileSize * 0.7 * perspective - 1);
-        }
+    // 近くの雲（大きく、速く）
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    for (let i = 0; i < 3; i++) {
+        const cloudX = ((i * 120 + scrollY * 0.2 + 60) % (GAME_WIDTH + 120)) - 60;
+        const cloudY = 280 + i * 80;
+        drawBackgroundCloud(cloudX, cloudY, 0.8);
     }
 
-    // 川（蛇行）
-    drawRiver(groundStartY);
+    // 太陽（右上に配置）
+    const sunX = GAME_WIDTH - 50;
+    const sunY = 60;
 
-    // 道路
-    drawRoad(groundStartY);
+    // 太陽のグロー
+    const sunGlow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 60);
+    sunGlow.addColorStop(0, 'rgba(255, 255, 200, 0.8)');
+    sunGlow.addColorStop(0.3, 'rgba(255, 255, 100, 0.3)');
+    sunGlow.addColorStop(1, 'rgba(255, 255, 0, 0)');
+    ctx.fillStyle = sunGlow;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, 60, 0, Math.PI * 2);
+    ctx.fill();
 
-    // 森/木々のクラスター
-    drawTrees(groundStartY);
-
-    // 建物のシルエット（遠景）
-    drawDistantBuildings(groundStartY);
-
-    // 地上と空中の境界線（霞み効果）
-    const hazeGradient = ctx.createLinearGradient(0, groundStartY - 20, 0, groundStartY + 30);
-    hazeGradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
-    hazeGradient.addColorStop(0.5, 'rgba(200, 230, 200, 0.4)');
-    hazeGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-    ctx.fillStyle = hazeGradient;
-    ctx.fillRect(0, groundStartY - 20, GAME_WIDTH, 50);
+    // 太陽本体
+    const sunGrad = ctx.createRadialGradient(sunX - 5, sunY - 5, 0, sunX, sunY, 25);
+    sunGrad.addColorStop(0, '#FFFFEE');
+    sunGrad.addColorStop(0.5, '#FFFF00');
+    sunGrad.addColorStop(1, '#FFD700');
+    ctx.fillStyle = sunGrad;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, 25, 0, Math.PI * 2);
+    ctx.fill();
 }
 
 function drawBackgroundCloud(x, y, scale) {
@@ -1451,183 +1199,31 @@ function drawBackgroundCloud(x, y, scale) {
     ctx.restore();
 }
 
-function drawRiver(groundStartY) {
-    const riverY = groundStartY + 80 + ((scrollY * 0.5) % 150);
-
-    // 川の影
-    ctx.fillStyle = 'rgba(0, 50, 100, 0.3)';
-    ctx.beginPath();
-    ctx.moveTo(-10, riverY + 5);
-    for (let x = 0; x <= GAME_WIDTH + 20; x += 15) {
-        const wave = Math.sin((x + scrollY * 0.5) * 0.03) * 12;
-        ctx.lineTo(x, riverY + wave + 5);
-    }
-    ctx.lineTo(GAME_WIDTH + 10, riverY + 35);
-    ctx.lineTo(-10, riverY + 35);
-    ctx.closePath();
-    ctx.fill();
-
-    // 川本体
-    const riverGradient = ctx.createLinearGradient(0, riverY, 0, riverY + 25);
-    riverGradient.addColorStop(0, '#4169E1');
-    riverGradient.addColorStop(0.5, '#1E90FF');
-    riverGradient.addColorStop(1, '#4169E1');
-    ctx.fillStyle = riverGradient;
-
-    ctx.beginPath();
-    ctx.moveTo(-10, riverY);
-    for (let x = 0; x <= GAME_WIDTH + 20; x += 15) {
-        const wave = Math.sin((x + scrollY * 0.5) * 0.03) * 12;
-        ctx.lineTo(x, riverY + wave);
-    }
-    ctx.lineTo(GAME_WIDTH + 10, riverY + 25);
-    ctx.lineTo(-10, riverY + 25);
-    ctx.closePath();
-    ctx.fill();
-
-    // 水面のハイライト
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 3; i++) {
-        const waveX = ((scrollY * 2 + i * 100) % (GAME_WIDTH + 50)) - 25;
-        ctx.beginPath();
-        ctx.moveTo(waveX, riverY + 8 + i * 5);
-        ctx.lineTo(waveX + 20, riverY + 8 + i * 5);
-        ctx.stroke();
-    }
-}
-
-function drawRoad(groundStartY) {
-    const roadY = groundStartY + 180 + ((scrollY * 0.6) % 200);
-
-    // 道路の影
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-    ctx.fillRect(-10, roadY + 3, GAME_WIDTH + 20, 24);
-
-    // 道路本体
-    ctx.fillStyle = '#8B7355';
-    ctx.fillRect(-10, roadY, GAME_WIDTH + 20, 20);
-
-    // 道路の境界線
-    ctx.fillStyle = '#6B5344';
-    ctx.fillRect(-10, roadY, GAME_WIDTH + 20, 3);
-    ctx.fillRect(-10, roadY + 17, GAME_WIDTH + 20, 3);
-
-    // 中央線（点線）
-    ctx.fillStyle = '#FFD700';
-    for (let x = -20 + ((scrollY * 2) % 40); x < GAME_WIDTH + 20; x += 40) {
-        ctx.fillRect(x, roadY + 9, 20, 2);
-    }
-}
-
-function drawTrees(groundStartY) {
-    // 木のクラスターを描画
-    const treePositions = [
-        { x: 20, offset: 0 },
-        { x: 80, offset: 50 },
-        { x: 150, offset: 100 },
-        { x: 220, offset: 30 },
-        { x: 280, offset: 80 }
-    ];
-
-    for (const tree of treePositions) {
-        const treeY = groundStartY + 40 + ((scrollY * 0.4 + tree.offset) % 120);
-        if (treeY > groundStartY + 20 && treeY < GAME_HEIGHT - 30) {
-            drawTree(tree.x, treeY);
-        }
-    }
-}
-
-function drawTree(x, y) {
-    ctx.save();
-    ctx.translate(x, y);
-
-    // 木の影
-    ctx.fillStyle = 'rgba(0, 50, 0, 0.3)';
-    ctx.beginPath();
-    ctx.ellipse(3, 12, 10, 5, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 幹
-    ctx.fillStyle = '#8B4513';
-    ctx.fillRect(-3, 0, 6, 12);
-
-    // 葉（複数の円で）
-    ctx.fillStyle = '#228B22';
-    ctx.beginPath();
-    ctx.arc(0, -8, 12, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#32CD32';
-    ctx.beginPath();
-    ctx.arc(-5, -5, 8, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(5, -6, 9, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#3CB371';
-    ctx.beginPath();
-    ctx.arc(0, -12, 7, 0, Math.PI * 2);
-    ctx.fill();
-
-    // ハイライト
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-    ctx.beginPath();
-    ctx.arc(-3, -10, 4, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.restore();
-}
-
-function drawDistantBuildings(groundStartY) {
-    // 遠景の建物シルエット
-    const buildingData = [
-        { x: 50, width: 25, height: 30 },
-        { x: 130, width: 20, height: 25 },
-        { x: 200, width: 30, height: 35 },
-        { x: 270, width: 22, height: 28 }
-    ];
-
-    ctx.fillStyle = 'rgba(100, 120, 100, 0.3)';
-    for (const b of buildingData) {
-        const bY = groundStartY + 10 + ((scrollY * 0.2) % 60);
-        if (bY > groundStartY && bY < groundStartY + 50) {
-            ctx.fillRect(b.x, bY - b.height, b.width, b.height);
-            // 窓
-            ctx.fillStyle = 'rgba(255, 255, 200, 0.3)';
-            for (let wy = 0; wy < 3; wy++) {
-                for (let wx = 0; wx < 2; wx++) {
-                    ctx.fillRect(b.x + 4 + wx * 10, bY - b.height + 5 + wy * 8, 5, 4);
-                }
-            }
-            ctx.fillStyle = 'rgba(100, 120, 100, 0.3)';
-        }
-    }
-}
-
 // =====================================================
 // GAME LOGIC
 // =====================================================
 
 function spawnCloud() {
-    if (Math.random() < 0.02) {
+    // 雲の出現率を下げる（画面内に2-3個程度）
+    if (Math.random() < 0.008) {
         clouds.push({
             x: Math.random() * (GAME_WIDTH - 60) + 30,
             y: -40,
             width: 40,
             height: 30,
-            hasBell: Math.random() < 0.7, // 70% chance to have a bell
+            hasBell: true,  // 全ての雲に鈴がある
             hits: 0
         });
     }
 }
 
 function spawnAirEnemy() {
-    // 序盤は敵の出現率を下げる
-    const spawnRate = 0.008 + stage * 0.004;
+    // 敵の出現率を大幅に下げる（序盤は特に少なく）
+    const spawnRate = 0.004 + stage * 0.002;
     if (Math.random() < spawnRate) {
-        // 序盤はbomberを出さない
+        // 序盤はbomberを出さない（ステージ4から）
         let types = ['bee', 'spinner', 'floater'];
-        if (stage >= 3) {
+        if (stage >= 4) {
             types.push('bomber');
         }
         const type = types[Math.floor(Math.random() * types.length)];
@@ -1636,14 +1232,14 @@ function spawnAirEnemy() {
         let points = 100;
         let shootInterval = 0;
 
-        // ステージに応じて弾の発射間隔を短くする（序盤は長め）
-        const difficultyMod = Math.max(1, 5 - stage * 0.5); // stage1=4.5, stage5=2.5, stage10=0
+        // ステージに応じて弾の発射間隔を短くする（序盤はかなり長め）
+        const difficultyMod = Math.max(1.5, 6 - stage * 0.5); // stage1=5.5, stage5=3.5, stage10=1.5
 
         switch (type) {
             case 'bee':
                 health = 1;
                 points = 100;
-                // 序盤: 540フレーム(9秒)ごと、後半: 120フレーム(2秒)ごと
+                // 序盤: 660フレーム(11秒)ごと、後半: 180フレーム(3秒)ごと
                 shootInterval = Math.floor(120 * difficultyMod);
                 break;
             case 'spinner':
@@ -1655,12 +1251,12 @@ function spawnAirEnemy() {
             case 'floater':
                 health = 1;
                 points = 150;
-                shootInterval = Math.floor(90 * difficultyMod);
+                shootInterval = Math.floor(100 * difficultyMod);
                 break;
             case 'bomber':
                 health = 4;
                 points = 500;
-                shootInterval = Math.floor(60 * difficultyMod);
+                shootInterval = Math.floor(80 * difficultyMod);
                 break;
         }
 
@@ -1681,46 +1277,6 @@ function spawnAirEnemy() {
     }
 }
 
-function spawnGroundEnemy() {
-    if (Math.random() < 0.006 + stage * 0.002) {
-        const types = ['turret', 'tank', 'building'];
-        const type = types[Math.floor(Math.random() * types.length)];
-
-        let health = 2;
-        let points = 200;
-
-        switch (type) {
-            case 'turret':
-                health = 2;
-                points = 200;
-                break;
-            case 'tank':
-                health = 3;
-                points = 300;
-                break;
-            case 'building':
-                health = 5;
-                points = 500;
-                break;
-        }
-
-        // 地上敵は画面下半分（地上エリア）の上端から出現
-        // 画面の50%〜55%の位置（地上エリアの開始地点付近）
-        const groundStartY = GAME_HEIGHT * 0.5;
-
-        groundEnemies.push({
-            x: Math.random() * (GAME_WIDTH - 40) + 20,
-            y: groundStartY - 40,  // 地上エリアの少し上から出現
-            width: 32,
-            height: 32,
-            type,
-            health,
-            points,
-            vx: type === 'tank' ? (Math.random() - 0.5) * 1 : 0,
-            isGround: true  // 地上敵フラグ
-        });
-    }
-}
 
 function shoot() {
     playShot();
@@ -1784,37 +1340,6 @@ function shoot() {
     });
 }
 
-function punch() {
-    if (player.punchCooldown > 0) return;
-    if (!player.armLeft && !player.armRight) return;
-
-    playPunch();
-    player.punchCooldown = 20;
-
-    // Create ground attack wave
-    const punchX = player.x;
-    const punchY = player.y + 40;
-
-    // Check ground enemies in range
-    groundEnemies.forEach(enemy => {
-        const dx = enemy.x - punchX;
-        const dy = enemy.y - punchY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-
-        if (dist < 50) {
-            enemy.health--;
-            createExplosion(enemy.x, enemy.y, 15);
-
-            if (enemy.health <= 0) {
-                score += enemy.points;
-                createExplosion(enemy.x, enemy.y, 30);
-                playExplosion();
-            }
-        }
-    });
-
-    groundEnemies = groundEnemies.filter(e => e.health > 0);
-}
 
 function getBell(bell) {
     playBellGet();
@@ -1961,14 +1486,17 @@ function resetPlayer() {
 }
 
 function checkCollisions() {
-    // Player bullets vs clouds
+    // Player bullets vs clouds（鈴がある雲のみ当たり判定）
     playerBullets.forEach(bullet => {
         clouds.forEach(cloud => {
+            // 鈴がない雲は弾が貫通する
+            if (!cloud.hasBell) return;
+
             if (rectCollision(bullet, cloud)) {
                 bullet.hit = true;
                 cloud.hits++;
 
-                if (cloud.hits >= 3 && cloud.hasBell) {
+                if (cloud.hits >= 3) {
                     // Release bell
                     bells.push({
                         x: cloud.x,
@@ -2091,12 +1619,6 @@ function update() {
         shoot();
     }
 
-    // Punch/bomb
-    if (keys.bomb && player.punchCooldown === 0) {
-        punch();
-    }
-
-    if (player.punchCooldown > 0) player.punchCooldown--;
     if (player.invincible > 0) player.invincible--;
 
     // Update bullets
@@ -2122,13 +1644,14 @@ function update() {
         b.vy = Math.min(b.vy, 2);
         b.y += b.vy;
 
-        // Bounce at screen edges
+        // Bounce at bottom of screen
         if (b.y > GAME_HEIGHT - 30) {
             b.y = GAME_HEIGHT - 30;
             b.vy = -2;
         }
     });
-    bells = bells.filter(b => b.y < GAME_HEIGHT + 30 && b.y > -30);
+    // 画面下に出た鈴のみ消す（上に出ても残す）
+    bells = bells.filter(b => b.y < GAME_HEIGHT + 30);
 
     // Update air enemies
     airEnemies.forEach(enemy => {
@@ -2160,16 +1683,6 @@ function update() {
     });
     airEnemies = airEnemies.filter(e => e.y < GAME_HEIGHT + 50 && e.y > -50);
 
-    // Update ground enemies
-    groundEnemies.forEach(enemy => {
-        enemy.x += enemy.vx || 0;
-        enemy.y += SCROLL_SPEED;
-
-        if (enemy.x < 20 || enemy.x > GAME_WIDTH - 20) {
-            enemy.vx *= -1;
-        }
-    });
-    groundEnemies = groundEnemies.filter(e => e.y < GAME_HEIGHT + 50);
 
     // Update explosions
     explosions.forEach(exp => exp.frame++);
@@ -2187,7 +1700,6 @@ function update() {
     // Spawn new objects
     spawnCloud();
     spawnAirEnemy();
-    spawnGroundEnemy();
 
     // Check collisions
     checkCollisions();
@@ -2210,23 +1722,6 @@ function draw() {
     // Draw background
     drawBackground();
 
-    // Draw ground enemies (地上レイヤーに埋め込む感じ)
-    // 地上エリアの境界線を示す薄い線
-    const groundStartY = GAME_HEIGHT * 0.5;
-    ctx.strokeStyle = 'rgba(0, 100, 0, 0.3)';
-    ctx.setLineDash([5, 5]);
-    ctx.beginPath();
-    ctx.moveTo(0, groundStartY);
-    ctx.lineTo(GAME_WIDTH, groundStartY);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // 地上敵を描画（地上エリア内のみ表示）
-    groundEnemies.forEach(e => {
-        if (e.y >= groundStartY - 20) {
-            drawGroundEnemy(e);
-        }
-    });
 
     // Draw clouds
     clouds.forEach(c => drawCloud(c));
@@ -2251,10 +1746,6 @@ function draw() {
         drawTwinBee(player.x, player.y, player.invincible);
     }
 
-    // Draw punch effect
-    if (player.punchCooldown > 15) {
-        drawPunch(player.x, player.y, 20 - player.punchCooldown);
-    }
 
     // Draw explosions
     explosions.forEach(exp => drawExplosion(exp));
@@ -2299,7 +1790,6 @@ function startGame() {
     bells = [];
     clouds = [];
     airEnemies = [];
-    groundEnemies = [];
     explosions = [];
     particles = [];
 
