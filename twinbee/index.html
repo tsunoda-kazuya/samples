@@ -185,6 +185,9 @@
             position: absolute;
             width: 50px;
             height: 50px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             background: rgba(255,255,255,0.7);
             border: 3px solid rgba(255,255,255,0.9);
             border-radius: 50%;
@@ -265,14 +268,14 @@
         <canvas id="gameCanvas" width="320" height="480"></canvas>
         <div id="startScreen">
             <h1>TWINBEE</h1>
-            <p class="start-version">v2.1</p>
+            <p class="start-version">v2.2</p>
             <p>タップしてゲームスタート</p>
             <button onclick="startGame()">START GAME</button>
             <p>スマホは縦画面でプレイしてください</p>
         </div>
         <button id="soundToggle" onclick="toggleSound()">🔊</button>
         <button id="pauseBtn" onclick="togglePause()">PAUSE</button>
-        <div id="version">v2.1</div>
+        <div id="version">v2.2</div>
         <div id="ui">
             <span>SCORE <span id="score">000000</span></span>
             <span>STAGE <span id="stage">1</span></span>

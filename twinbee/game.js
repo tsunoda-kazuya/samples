@@ -1909,28 +1909,7 @@ function setupTouchControls() {
         return;
     }
 
-    // ノブを中央に配置するためのオフセットを動的に計算
     const maxDistance = 30;
-
-    function getCenterOffset() {
-        // ジョイスティックの内部サイズ（borderを除く）とノブのサイズから計算
-        const joystickRect = joystick.getBoundingClientRect();
-        const knobRect = knob.getBoundingClientRect();
-        // content幅を取得（border除く）
-        const joystickInnerWidth = joystick.clientWidth;
-        const joystickInnerHeight = joystick.clientHeight;
-        const knobWidth = knob.offsetWidth;
-        const knobHeight = knob.offsetHeight;
-        return {
-            x: (joystickInnerWidth - knobWidth) / 2,
-            y: (joystickInnerHeight - knobHeight) / 2
-        };
-    }
-
-    // 初期位置を設定
-    const initialOffset = getCenterOffset();
-    knob.style.left = initialOffset.x + 'px';
-    knob.style.top = initialOffset.y + 'px';
 
     function updateJoystick(touchX, touchY) {
         const rect = joystick.getBoundingClientRect();
@@ -1947,10 +1926,8 @@ function setupTouchControls() {
             dy = (dy / distance) * maxDistance;
         }
 
-        // Update knob position
-        const offset = getCenterOffset();
-        knob.style.left = (offset.x + dx) + 'px';
-        knob.style.top = (offset.y + dy) + 'px';
+        // Update knob position using transform (CSS handles centering)
+        knob.style.transform = 'translate(calc(-50% + ' + dx + 'px), calc(-50% + ' + dy + 'px))';
 
         // Update keys based on direction (with deadzone)
         const deadzone = 8;
@@ -1961,9 +1938,7 @@ function setupTouchControls() {
     }
 
     function resetJoystick() {
-        const offset = getCenterOffset();
-        knob.style.left = offset.x + 'px';
-        knob.style.top = offset.y + 'px';
+        knob.style.transform = 'translate(-50%, -50%)';
         keys.left = false;
         keys.right = false;
         keys.up = false;
