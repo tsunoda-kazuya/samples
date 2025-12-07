@@ -1910,16 +1910,13 @@ function setupTouchControls() {
     }
 
     const maxDistance = 30;
+    let touchStartX = 0;
+    let touchStartY = 0;
 
     function updateJoystick(touchX, touchY) {
-        // ジョイスティックの中心座標を取得
-        const rect = joystick.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-
-        // 中心からのオフセット
-        let dx = touchX - centerX;
-        let dy = touchY - centerY;
+        // タッチ開始位置からの相対移動で方向を決定
+        let dx = touchX - touchStartX;
+        let dy = touchY - touchStartY;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
         // 最大距離でクランプ
@@ -1947,23 +1944,30 @@ function setupTouchControls() {
         keys.down = false;
         joystickActive = false;
         joystickTouchId = null;
+        touchStartX = 0;
+        touchStartY = 0;
     }
 
     // Touch start on joystick - changedTouchesを使って新しいタッチのみ取得
     joystick.addEventListener('touchstart', function(e) {
         e.preventDefault();
+        e.stopPropagation();
         // このイベントで開始されたタッチのみを処理
         if (e.changedTouches.length > 0 && joystickTouchId === null) {
             const touch = e.changedTouches[0];
             joystickTouchId = touch.identifier;
             joystickActive = true;
-            updateJoystick(touch.clientX, touch.clientY);
+            // タッチ開始位置を記憶（この位置が中心になる）
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+            // 開始時は移動なし
         }
     }, { passive: false });
 
     // Touch move - ジョイスティックで開始されたタッチIDのみ追跡
     joystick.addEventListener('touchmove', function(e) {
         e.preventDefault();
+        e.stopPropagation();
         if (!joystickActive || joystickTouchId === null) return;
 
         // changedTouchesから該当するタッチを探す
@@ -1978,6 +1982,7 @@ function setupTouchControls() {
     // Touch end - 該当するタッチが終了した場合のみリセット
     joystick.addEventListener('touchend', function(e) {
         e.preventDefault();
+        e.stopPropagation();
         for (let i = 0; i < e.changedTouches.length; i++) {
             if (e.changedTouches[i].identifier === joystickTouchId) {
                 resetJoystick();
@@ -1987,6 +1992,7 @@ function setupTouchControls() {
     }, { passive: false });
 
     joystick.addEventListener('touchcancel', function(e) {
+        e.stopPropagation();
         for (let i = 0; i < e.changedTouches.length; i++) {
             if (e.changedTouches[i].identifier === joystickTouchId) {
                 resetJoystick();
@@ -1995,21 +2001,29 @@ function setupTouchControls() {
         }
     }, { passive: false });
 
-    // Shot button
+    // Shot button - 完全に独立したタッチ処理
     if (btnShot) {
         btnShot.addEventListener('touchstart', function(e) {
             e.preventDefault();
+            e.stopPropagation();
             keys.shot = true;
             btnShot.classList.add('active');
         }, { passive: false });
 
+        btnShot.addEventListener('touchmove', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }, { passive: false });
+
         btnShot.addEventListener('touchend', function(e) {
             e.preventDefault();
+            e.stopPropagation();
             keys.shot = false;
             btnShot.classList.remove('active');
         }, { passive: false });
 
         btnShot.addEventListener('touchcancel', function(e) {
+            e.stopPropagation();
             keys.shot = false;
             btnShot.classList.remove('active');
         }, { passive: false });
