@@ -1897,8 +1897,6 @@ document.addEventListener('keyup', (e) => {
 // Touch controls - Analog joystick (Safari compatible)
 let joystickActive = false;
 let joystickTouchId = null;
-let knobCenterX = 0;
-let knobCenterY = 0;
 
 function setupTouchControls() {
     const joystick = document.getElementById('joystick');
@@ -1909,15 +1907,15 @@ function setupTouchControls() {
         return;
     }
 
-    const maxDistance = 30;
+    const maxDistance = 35;
     let touchStartX = 0;
     let touchStartY = 0;
 
     function updateJoystick(touchX, touchY) {
         // タッチ開始位置からの相対移動で方向を決定
-        let dx = touchX - touchStartX;
-        let dy = touchY - touchStartY;
-        const distance = Math.sqrt(dx * dx + dy * dy);
+        var dx = touchX - touchStartX;
+        var dy = touchY - touchStartY;
+        var distance = Math.sqrt(dx * dx + dy * dy);
 
         // 最大距離でクランプ
         if (distance > maxDistance) {
@@ -1925,11 +1923,12 @@ function setupTouchControls() {
             dy = (dy / distance) * maxDistance;
         }
 
-        // ノブの位置を更新（中心からのオフセット）
-        knob.style.transform = 'translate(' + (-50 + (dx / 25) * 50) + '%, ' + (-50 + (dy / 25) * 50) + '%)';
+        // ノブの位置を更新（中心からのオフセット、maxDistanceで正規化）
+        var offsetPercent = 35; // ノブの最大移動量(%)
+        knob.style.transform = 'translate(' + (-50 + (dx / maxDistance) * offsetPercent) + '%, ' + (-50 + (dy / maxDistance) * offsetPercent) + '%)';
 
         // 方向キーの状態を更新（デッドゾーン付き）
-        const deadzone = 10;
+        var deadzone = 8;
         keys.left = dx < -deadzone;
         keys.right = dx > deadzone;
         keys.up = dy < -deadzone;
@@ -1960,6 +1959,8 @@ function setupTouchControls() {
             // タッチ開始位置を記憶（この位置が中心になる）
             touchStartX = touch.clientX;
             touchStartY = touch.clientY;
+            // タッチ開始時点で即座に更新（タップだけでも反応するように）
+            updateJoystick(touch.clientX, touch.clientY);
         }
     }, { passive: false });
 
