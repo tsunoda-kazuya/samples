@@ -41,7 +41,7 @@ const player = {
     height: 32,
     speed: 4,
     shotLevel: 3,      // 1=single, 2=double, 3=spread (初期は3)
-    hasShield: false,
+    shieldCount: 0,    // 0=なし, 1-3=バリア枚数
     speedUp: 0,
     options: [],       // trailing options
     armLeft: true,     // arms can be shot off
@@ -598,30 +598,31 @@ function drawTwinBee(x, y, invincible) {
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Shield effect - より豪華に
-    if (player.hasShield) {
-        const shieldSize = 24 + Math.sin(frameCount * 0.15) * 2;
-        // 外側のグロー
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
-        ctx.lineWidth = 6;
-        ctx.beginPath();
-        ctx.arc(0, 0, shieldSize + 4, 0, Math.PI * 2);
-        ctx.stroke();
-        // メインシールド
-        const shieldGrad = ctx.createRadialGradient(0, 0, shieldSize - 5, 0, 0, shieldSize);
-        shieldGrad.addColorStop(0, 'rgba(0, 255, 255, 0)');
-        shieldGrad.addColorStop(0.7, 'rgba(0, 255, 255, 0.2)');
-        shieldGrad.addColorStop(1, 'rgba(0, 255, 255, 0.6)');
-        ctx.fillStyle = shieldGrad;
-        ctx.beginPath();
-        ctx.arc(0, 0, shieldSize, 0, Math.PI * 2);
-        ctx.fill();
-        // キラキラエフェクト
+    // Shield effect - 3重バリア対応
+    if (player.shieldCount > 0) {
+        for (var si = 0; si < player.shieldCount; si++) {
+            var shieldSize = 24 + si * 8 + Math.sin(frameCount * 0.15 + si) * 2;
+            var alpha = 0.6 - si * 0.15;
+            // 外側のグロー
+            ctx.strokeStyle = 'rgba(0, 255, 100, ' + (alpha * 0.5) + ')';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(0, 0, shieldSize + 2, 0, Math.PI * 2);
+            ctx.stroke();
+            // メインシールド
+            ctx.strokeStyle = 'rgba(0, 255, 150, ' + alpha + ')';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, shieldSize, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        // キラキラエフェクト（最外周のみ）
+        var outerSize = 24 + (player.shieldCount - 1) * 8;
         ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        for (let i = 0; i < 6; i++) {
-            const sparkAngle = frameCount * 0.1 + i * Math.PI / 3;
-            const sparkX = Math.cos(sparkAngle) * shieldSize;
-            const sparkY = Math.sin(sparkAngle) * shieldSize;
+        for (var i = 0; i < 6; i++) {
+            var sparkAngle = frameCount * 0.1 + i * Math.PI / 3;
+            var sparkX = Math.cos(sparkAngle) * outerSize;
+            var sparkY = Math.sin(sparkAngle) * outerSize;
             ctx.beginPath();
             ctx.arc(sparkX, sparkY, 2, 0, Math.PI * 2);
             ctx.fill();
@@ -1377,8 +1378,8 @@ function getBell(bell) {
             break;
 
         case 'GREEN':
-            // Shield
-            player.hasShield = true;
+            // Shield (最大3重)
+            player.shieldCount = Math.min(player.shieldCount + 1, 3);
             playPowerUp();
             createParticles(bell.x, bell.y, '#32CD32', 15);
             break;
@@ -1450,10 +1451,12 @@ function createParticles(x, y, color, count) {
 function playerHit() {
     if (player.invincible > 0) return;
 
-    if (player.hasShield) {
-        player.hasShield = false;
+    // バリアがあれば1枚消費
+    if (player.shieldCount > 0) {
+        player.shieldCount--;
         player.invincible = 60;
         playHit();
+        createParticles(player.x, player.y, '#32CD32', 10);
         return;
     }
 
@@ -1502,7 +1505,7 @@ function resetPlayer() {
     player.y = GAME_HEIGHT - 80;
     player.invincible = 120;
     player.shotLevel = 3;  // 初期は3方向発射
-    player.hasShield = false;
+    player.shieldCount = 0;
     player.speedUp = 0;
     player.speed = 4;
     player.options = [];
