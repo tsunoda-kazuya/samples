@@ -32,12 +32,12 @@ struct ArticleView: View {
                     Button {
                         safariItem = IdentifiableURL(url: web.url ?? entry.link)
                     } label: {
-                        Label("Safariリーダーで開く", systemImage: "doc.plaintext")
+                        Label("Safari表示で開く（Adblock Plus有効）", systemImage: "safari")
                     }
                     Button {
                         UIApplication.shared.open(web.url ?? entry.link)
                     } label: {
-                        Label("Safariアプリで開く", systemImage: "safari")
+                        Label("Safariアプリで開く", systemImage: "arrow.up.forward.app")
                     }
                     Button {
                         UIPasteboard.general.url = web.url ?? entry.link
@@ -88,7 +88,7 @@ struct ArticleView: View {
                 .presentationDragIndicator(.visible)
         }
         .fullScreenCover(item: $safariItem) { item in
-            SafariView(url: item.url, reader: item.url.host != "b.hatena.ne.jp")
+            SafariView(url: item.url, onFinish: { safariItem = nil })
                 .ignoresSafeArea()
         }
     }

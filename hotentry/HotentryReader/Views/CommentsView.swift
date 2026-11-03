@@ -51,7 +51,7 @@ struct CommentsView: View {
             .refreshable { await load() }
             .task { await load() }
             .fullScreenCover(item: $safariItem) { item in
-                SafariView(url: item.url, reader: false).ignoresSafeArea()
+                SafariView(url: item.url, onFinish: { safariItem = nil }).ignoresSafeArea()
             }
         }
     }

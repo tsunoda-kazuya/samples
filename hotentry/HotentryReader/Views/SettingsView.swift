@@ -6,7 +6,7 @@ struct SettingsView: View {
     @AppStorage("adblockEnabled") private var adblockEnabled = true
     @AppStorage("javascriptEnabled") private var javascriptEnabled = true
     @AppStorage("extraBlockDomains") private var extraBlockDomains = ""
-    @AppStorage("openInSafariReader") private var openInSafariReader = false
+    @AppStorage("openMode") private var openMode: OpenMode = .safari
     @AppStorage("hideRead") private var hideRead = false
     @AppStorage("muteWords") private var muteWords = ""
     @State private var confirmClear = false
@@ -15,10 +15,22 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section {
+                    Picker("記事の開き方", selection: $openMode) {
+                        ForEach(OpenMode.allCases) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                } header: {
+                    Text("記事の開き方")
+                } footer: {
+                    Text("「Safari表示」では、Safariに設定したコンテンツブロッカー（Adblock Plus・280blocker等）が効きます。iPhoneの「設定 > アプリ > Safari > 機能拡張」でブロッカーがオンになっていることを確認してください。一覧の右スワイプでリーダー表示、長押しで開き方を選べます。")
+                }
+
+                Section {
                     Toggle("広告ブロック", isOn: $adblockEnabled)
                     Toggle("JavaScriptを有効にする", isOn: $javascriptEnabled)
                 } header: {
-                    Text("記事ビュー")
+                    Text("アプリ内ブラウザ")
                 } footer: {
                     Text("JavaScriptをオフにすると、ほとんどの広告やポップアップが表示されなくなり軽くなります（一部のサイトは表示が崩れます）。変更は次に開く記事から反映されます。")
                 }
@@ -33,12 +45,6 @@ struct SettingsView: View {
                     Text("追加でブロックするドメイン（1行に1つ）")
                 } footer: {
                     Text("例: ads.example.com　サブドメインもまとめてブロックされます。組み込みのリストには \(AdBlocker.blockedDomains.count) 件のドメインが登録済みです。")
-                }
-
-                Section {
-                    Toggle("タップでSafariリーダー表示", isOn: $openInSafariReader)
-                } footer: {
-                    Text("オンにすると記事をSafariのリーダー表示で開きます。Safariに設定したコンテンツブロッカー（280blocker・AdGuard等）も有効になります。一覧で記事を右スワイプしても同じ表示で開けます。")
                 }
 
                 Section {

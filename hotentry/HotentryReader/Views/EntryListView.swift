@@ -30,12 +30,12 @@ struct EntryListView: View {
 
     @AppStorage("category") private var category: HatenaCategory = .all
     @AppStorage("feedMode") private var mode: FeedMode = .hot
-    @AppStorage("openInSafariReader") private var openInSafariReader = false
+    @AppStorage("openMode") private var openMode: OpenMode = .safari
     @AppStorage("hideRead") private var hideRead = false
     @AppStorage("muteWords") private var muteWords = ""
 
     @State private var path: [Entry] = []
-    @State private var safariItem: IdentifiableURL?
+    @State private var safariItem: SafariPresentation?
     @State private var showSettings = false
 
     private var key: String { FeedStore.key(category, mode) }
@@ -82,7 +82,7 @@ struct EntryListView: View {
             .task(id: key) { await store.load(category, mode) }
             .sheet(isPresented: $showSettings) { SettingsView() }
             .fullScreenCover(item: $safariItem) { item in
-                SafariView(url: item.url).ignoresSafeArea()
+                SafariArticleScreen(presentation: item) { safariItem = nil }
             }
         }
     }
@@ -133,7 +133,7 @@ struct EntryListView: View {
         } else {
             List(entries) { entry in
                 Button {
-                    open(entry)
+                    open(entry, mode: openMode)
                 } label: {
                     EntryRow(entry: entry, isRead: history.isRead(entry))
                 }
@@ -148,8 +148,7 @@ struct EntryListView: View {
                 }
                 .swipeActions(edge: .leading) {
                     Button {
-                        safariItem = IdentifiableURL(url: entry.link)
-                        history.markRead(entry)
+                        open(entry, mode: .reader)
                     } label: {
                         Label("リーダー", systemImage: "doc.plaintext")
                     }
@@ -157,15 +156,19 @@ struct EntryListView: View {
                 }
                 .contextMenu {
                     Button {
-                        path.append(entry)
+                        open(entry, mode: .safari)
                     } label: {
-                        Label("アプリ内で開く", systemImage: "globe")
+                        Label("Safari表示で開く", systemImage: "safari")
                     }
                     Button {
-                        safariItem = IdentifiableURL(url: entry.link)
-                        history.markRead(entry)
+                        open(entry, mode: .reader)
                     } label: {
                         Label("Safariリーダーで開く", systemImage: "doc.plaintext")
+                    }
+                    Button {
+                        open(entry, mode: .inApp)
+                    } label: {
+                        Label("アプリ内ブラウザで開く", systemImage: "globe")
                     }
                     ShareLink(item: entry.link)
                 } preview: {
@@ -182,11 +185,12 @@ struct EntryListView: View {
         }
     }
 
-    private func open(_ entry: Entry) {
-        if openInSafariReader {
+    private func open(_ entry: Entry, mode: OpenMode) {
+        switch mode {
+        case .safari, .reader:
             history.markRead(entry)
-            safariItem = IdentifiableURL(url: entry.link)
-        } else {
+            safariItem = SafariPresentation(entry: entry, reader: mode == .reader)
+        case .inApp:
             path.append(entry)
         }
     }
