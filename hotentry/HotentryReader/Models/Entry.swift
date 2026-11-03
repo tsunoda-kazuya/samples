@@ -30,21 +30,6 @@ struct Entry: Identifiable, Hashable {
     }
 }
 
-/// 記事の開き方
-enum OpenMode: String, CaseIterable, Identifiable {
-    case safari      // SFSafariViewController (Safari のコンテンツブロッカーが効く)
-    case reader      // SFSafariViewController のリーダー表示
-    case inApp       // 内蔵ブロッカー付き WKWebView
-    var id: String { rawValue }
-    var label: String {
-        switch self {
-        case .safari: "Safari表示（Adblock Plus等が効く）"
-        case .reader: "Safariリーダー表示"
-        case .inApp: "アプリ内ブラウザ（内蔵ブロック）"
-        }
-    }
-}
-
 enum FeedMode: String, CaseIterable, Identifiable {
     case hot = "hotentry"
     case new = "entrylist"

@@ -28,7 +28,11 @@ final class WebViewModel: NSObject, ObservableObject, WKNavigationDelegate, WKUI
         config.defaultWebpagePreferences.allowsContentJavaScript = options.javaScript
         config.preferences.javaScriptCanOpenWindowsAutomatically = false
         if options.adBlock {
+            // 内蔵ルール + EasyList 等のフィルタリスト (Adblock Plus と同じリスト)
             if let list = await AdBlocker.shared.ruleList(extraDomains: options.extraDomains) {
+                config.userContentController.add(list)
+            }
+            for list in await FilterListManager.shared.ruleLists() {
                 config.userContentController.add(list)
             }
             config.userContentController.addUserScript(AdBlocker.cleanupScript)
@@ -54,6 +58,7 @@ final class WebViewModel: NSObject, ObservableObject, WKNavigationDelegate, WKUI
     func goBack() { webView?.goBack() }
     func goForward() { webView?.goForward() }
     func reload() { webView?.reload() }
+    func load(_ url: URL) { webView?.load(URLRequest(url: url)) }
 
     // MARK: - WKNavigationDelegate
 

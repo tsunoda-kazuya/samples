@@ -8,7 +8,6 @@ struct CommentsView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @AppStorage("showEmptyComments") private var showEmptyComments = false
-    @State private var safariItem: IdentifiableURL?
 
     private var visible: [Bookmark] {
         showEmptyComments ? bookmarks : bookmarks.filter { !$0.comment.isEmpty }
@@ -34,13 +33,6 @@ struct CommentsView: View {
             .navigationTitle(titleText)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        safariItem = IdentifiableURL(url: entry.hatenaEntryURL)
-                    } label: {
-                        Image(systemName: "safari")
-                    }
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Toggle(isOn: $showEmptyComments) {
                         Image(systemName: showEmptyComments ? "text.bubble.fill" : "text.bubble")
@@ -50,9 +42,6 @@ struct CommentsView: View {
             }
             .refreshable { await load() }
             .task { await load() }
-            .fullScreenCover(item: $safariItem) { item in
-                SafariView(url: item.url, onFinish: { safariItem = nil }).ignoresSafeArea()
-            }
         }
     }
 

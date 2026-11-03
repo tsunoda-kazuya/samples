@@ -30,12 +30,10 @@ struct EntryListView: View {
 
     @AppStorage("category") private var category: HatenaCategory = .all
     @AppStorage("feedMode") private var mode: FeedMode = .hot
-    @AppStorage("openMode") private var openMode: OpenMode = .safari
     @AppStorage("hideRead") private var hideRead = false
     @AppStorage("muteWords") private var muteWords = ""
 
     @State private var path: [Entry] = []
-    @State private var safariItem: SafariPresentation?
     @State private var showSettings = false
 
     private var key: String { FeedStore.key(category, mode) }
@@ -81,9 +79,6 @@ struct EntryListView: View {
             }
             .task(id: key) { await store.load(category, mode) }
             .sheet(isPresented: $showSettings) { SettingsView() }
-            .fullScreenCover(item: $safariItem) { item in
-                SafariArticleScreen(presentation: item) { safariItem = nil }
-            }
         }
     }
 
@@ -133,7 +128,7 @@ struct EntryListView: View {
         } else {
             List(entries) { entry in
                 Button {
-                    open(entry, mode: openMode)
+                    path.append(entry)
                 } label: {
                     EntryRow(entry: entry, isRead: history.isRead(entry))
                 }
@@ -146,29 +141,16 @@ struct EntryListView: View {
                     }
                     .tint(.gray)
                 }
-                .swipeActions(edge: .leading) {
-                    Button {
-                        open(entry, mode: .reader)
-                    } label: {
-                        Label("リーダー", systemImage: "doc.plaintext")
-                    }
-                    .tint(.orange)
-                }
                 .contextMenu {
                     Button {
-                        open(entry, mode: .safari)
+                        history.markRead(entry)
                     } label: {
-                        Label("Safari表示で開く", systemImage: "safari")
+                        Label("既読にする", systemImage: "checkmark")
                     }
                     Button {
-                        open(entry, mode: .reader)
+                        UIPasteboard.general.url = entry.link
                     } label: {
-                        Label("Safariリーダーで開く", systemImage: "doc.plaintext")
-                    }
-                    Button {
-                        open(entry, mode: .inApp)
-                    } label: {
-                        Label("アプリ内ブラウザで開く", systemImage: "globe")
+                        Label("URLをコピー", systemImage: "doc.on.doc")
                     }
                     ShareLink(item: entry.link)
                 } preview: {
@@ -185,13 +167,4 @@ struct EntryListView: View {
         }
     }
 
-    private func open(_ entry: Entry, mode: OpenMode) {
-        switch mode {
-        case .safari, .reader:
-            history.markRead(entry)
-            safariItem = SafariPresentation(entry: entry, reader: mode == .reader)
-        case .inApp:
-            path.append(entry)
-        }
-    }
 }

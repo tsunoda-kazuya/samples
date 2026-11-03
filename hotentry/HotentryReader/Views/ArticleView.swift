@@ -5,7 +5,6 @@ struct ArticleView: View {
 
     @StateObject private var web = WebViewModel()
     @State private var showComments = false
-    @State private var safariItem: IdentifiableURL?
 
     @AppStorage("adblockEnabled") private var adblockEnabled = true
     @AppStorage("javascriptEnabled") private var javascriptEnabled = true
@@ -30,24 +29,19 @@ struct ArticleView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {
-                        safariItem = IdentifiableURL(url: web.url ?? entry.link)
-                    } label: {
-                        Label("Safari表示で開く（Adblock Plus有効）", systemImage: "safari")
-                    }
-                    Button {
-                        UIApplication.shared.open(web.url ?? entry.link)
-                    } label: {
-                        Label("Safariアプリで開く", systemImage: "arrow.up.forward.app")
-                    }
-                    Button {
                         UIPasteboard.general.url = web.url ?? entry.link
                     } label: {
                         Label("URLをコピー", systemImage: "doc.on.doc")
                     }
                     Button {
-                        safariItem = IdentifiableURL(url: entry.hatenaEntryURL)
+                        web.load(entry.hatenaEntryURL)
                     } label: {
                         Label("はてブのページを開く", systemImage: "bookmark")
+                    }
+                    Button {
+                        web.load(entry.link)
+                    } label: {
+                        Label("記事の最初に戻る", systemImage: "arrow.uturn.backward")
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
@@ -86,10 +80,6 @@ struct ArticleView: View {
                 .presentationDetents([.medium, .large])
                 .presentationBackgroundInteraction(.enabled(upThrough: .medium))
                 .presentationDragIndicator(.visible)
-        }
-        .fullScreenCover(item: $safariItem) { item in
-            SafariView(url: item.url, onFinish: { safariItem = nil })
-                .ignoresSafeArea()
         }
     }
 }

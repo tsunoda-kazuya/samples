@@ -1,36 +1,29 @@
 # ホッテントリ (Hotentry Reader)
 
 はてなブックマークの [ホッテントリ](https://b.hatena.ne.jp/hotentry/) を読むための iOS アプリ。
-公式アプリでは記事ページの広告ブロックが効かない問題を解決するため、記事を **Safari 表示（SFSafariViewController）** で開きます。
-Safari に設定したコンテンツブロッカー（Adblock Plus / 280blocker / AdGuard 等）がそのまま効きます。
+公式アプリでは記事ページの広告ブロックが効かない問題を解決するため、**Adblock Plus と同じフィルタリスト（EasyList 等）をアプリ内ブラウザに取り込んで**広告を消します。記事はすべてアプリ内で開き、Safari には移動しません。
 
-> WKWebView（一般的なアプリ内ブラウザ）には Safari のコンテンツブロッカーが効かないため、この方式にしています。
-> ブロッカーは iPhone の「設定 > アプリ > Safari > 機能拡張」でオンにしておいてください。
-
-## 記事の開き方（設定で切替）
-
-| モード | 広告ブロック | 備考 |
-|---|---|---|
-| **Safari表示**（デフォルト） | Safari のコンテンツブロッカー（Adblock Plus 等） | 右下のボタンでブコメを表示 |
-| Safariリーダー表示 | 本文のみ表示なので広告なし | 一覧で右スワイプでも開ける |
-| アプリ内ブラウザ | アプリ内蔵のブロックルール | ブコメはツールバーから |
+> iOS の仕様上、Safari 用の広告ブロッカー（Adblock Plus 等）は他アプリの WKWebView には効きません。
+> Adblock Plus の iOS 版自体も「EasyList を Safari コンテンツブロッカー形式に変換する」仕組みなので、このアプリは同じ変換を自前で行い、アプリ内ブラウザに適用しています。
 
 ## 機能
 
 - **一覧**: 人気 / 新着 × カテゴリ（総合・一般・世の中・政治と経済・暮らし・学び・テクノロジー・おもしろ・エンタメ・アニメとゲーム）
   - サムネイル・ファビコン・users 数・投稿時刻
   - 既読はグレー表示（「既読を隠す」設定あり）、引っ張って更新
-  - 右スワイプ → Safari リーダーで開く / 左スワイプ → 既読にする / 長押し → 開き方を選ぶ・プレビュー・共有
+  - 左スワイプ → 既読にする / 長押し → プレビュー・URL コピー・共有
   - ミュートワード（タイトル・URL・ドメインで非表示）
-- **アプリ内ブラウザモード（内蔵ブロック付き WKWebView）**
-  - 広告・トラッカー配信ドメイン約 120 件をネットワークレベルで遮断（`WKContentRuleList`）
+- **記事ビュー（広告ブロック付きアプリ内ブラウザ）**
+  - フィルタリストを取得して `WKContentRuleList` に変換（3 日ごとに自動更新、設定から手動更新も可）
+    - EasyList（Adblock Plus 標準）・AdGuard 日本語フィルタ: デフォルト ON
+    - EasyPrivacy（トラッカー）・Fanboy's Annoyance（Cookie バナー等）: 任意
+  - 上記に加えて内蔵ルール（国内外の広告ドメイン約 120 件）
   - よくある広告枠（AdSense, GPT, Taboola, Outbrain, popIn, YDN, i-mobile, MicroAd, はてなブログの広告枠 など）を CSS で非表示
   - 画面下に追従する広告オーバーレイの除去、広告による勝手な App Store 遷移・ポップアップの阻止
   - JavaScript オフの「超軽量モード」（設定）
   - 独自のブロックドメインを追加可能（設定）
   - スワイプで戻る/進む、共有、Safari で開く
 - **ブコメ**: 記事を読みながらハーフシートでコメント一覧（コメントなしブクマの表示切替）
-- **Safari 表示**: 記事の上に浮かぶボタンからブコメをハーフシートで表示（記事はスクロールしたまま読める）
 
 ## ビルド方法
 
@@ -56,7 +49,9 @@ HotentryReader/
 ├── Services/
 │   ├── HatenaAPI.swift         RSS / ブコメ(jsonlite) 取得
 │   ├── RSSParser.swift         RSS 1.0 パーサ
-│   ├── AdBlocker.swift         広告ブロックルール（ドメイン・セレクタはここで編集）
+│   ├── AdBlocker.swift         内蔵の広告ブロックルール（ドメイン・セレクタはここで編集）
+│   ├── FilterListConverter.swift  Adblock Plus 形式 → WKContentRuleList 変換
+│   ├── FilterListManager.swift    フィルタリストの取得・コンパイル・自動更新
 │   └── ReadHistory.swift       既読管理
 └── Views/
     ├── EntryListView.swift     一覧
@@ -64,7 +59,6 @@ HotentryReader/
     ├── ArticleView.swift       記事ビュー
     ├── WebViewModel.swift      WKWebView 制御（遷移・ポップアップ制御）
     ├── CommentsView.swift      ブコメ
-    ├── SafariView.swift
     └── SettingsView.swift
 ```
 
@@ -72,5 +66,6 @@ HotentryReader/
 
 - 一覧: `https://b.hatena.ne.jp/{hotentry|entrylist}/{category}.rss`
 - ブコメ: `https://b.hatena.ne.jp/entry/jsonlite/?url={記事URL}`
+- フィルタ: `raw.githubusercontent.com` の easylist/easylist（gh-pages）と AdguardTeam/FiltersRegistry
 
 個人利用を想定したアプリです。
