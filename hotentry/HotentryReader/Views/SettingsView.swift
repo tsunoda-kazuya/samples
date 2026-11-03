@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @Environment(\.dismiss) private var dismiss
     @ObservedObject private var filters = FilterListManager.shared
+    @EnvironmentObject private var sources: FeedSourceStore
 
     @AppStorage("adblockEnabled") private var adblockEnabled = true
     @AppStorage("javascriptEnabled") private var javascriptEnabled = true
@@ -22,6 +22,16 @@ struct SettingsView: View {
                     Text("記事ビュー")
                 } footer: {
                     Text("JavaScriptをオフにすると、ほとんどの広告やポップアップが表示されなくなり軽くなります（一部のサイトは表示が崩れます）。変更は次に開く記事から反映されます。")
+                }
+
+                Section {
+                    NavigationLink {
+                        FeedSourcesView()
+                    } label: {
+                        LabeledContent("まとめサイト・RSS", value: "\(sources.enabled.count) / \(sources.sources.count)")
+                    }
+                } header: {
+                    Text("読み込むサイト")
                 }
 
                 filterSection
@@ -58,12 +68,11 @@ struct SettingsView: View {
             }
             .navigationTitle("設定")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("完了") {
-                        if filtersChanged { Task { await filters.update() } }
-                        dismiss()
-                    }
+            .onDisappear {
+                // フィルタの ON/OFF を変えたら設定画面を離れた時に再構築
+                if filtersChanged {
+                    filtersChanged = false
+                    Task { await filters.update() }
                 }
             }
             .confirmationDialog("既読履歴を消去しますか？", isPresented: $confirmClear, titleVisibility: .visible) {

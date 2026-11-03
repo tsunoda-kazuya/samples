@@ -28,16 +28,25 @@ struct EntryRow: View {
                     .frame(width: 14, height: 14)
                     .clipShape(RoundedRectangle(cornerRadius: 3))
 
-                    Text(entry.domain)
+                    Text(entry.sourceName ?? entry.domain)
                         .lineLimit(1)
                         .foregroundStyle(.secondary)
                 }
                 .font(.caption)
 
                 HStack(spacing: 8) {
-                    Text("\(entry.bookmarkCount) users")
-                        .font(.caption.bold())
-                        .foregroundStyle(Color(red: 1.0, green: 0.25, blue: 0.4))
+                    if entry.bookmarkCount > 0 {
+                        Text("\(entry.bookmarkCount) users")
+                            .font(.caption.bold())
+                            .foregroundStyle(Color(red: 1.0, green: 0.25, blue: 0.4))
+                    } else if !entry.isHatena {
+                        Text("まとめ")
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Capsule().fill(Color.orange.opacity(0.15)))
+                            .foregroundStyle(.orange)
+                    }
                     if let date = entry.date {
                         Text(Self.relative.localizedString(for: date, relativeTo: .now))
                             .font(.caption)

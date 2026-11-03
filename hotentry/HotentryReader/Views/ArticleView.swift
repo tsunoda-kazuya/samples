@@ -2,6 +2,9 @@ import SwiftUI
 
 struct ArticleView: View {
     let entry: Entry
+    /// だらだら読み用: 一覧で次にある未読記事
+    var nextEntry: Entry? = nil
+    var onNext: (Entry) -> Void = { _ in }
 
     @StateObject private var web = WebViewModel()
     @State private var showComments = false
@@ -43,6 +46,9 @@ struct ArticleView: View {
                     } label: {
                         Label("記事の最初に戻る", systemImage: "arrow.uturn.backward")
                     }
+                    Button(action: web.reload) {
+                        Label("再読み込み", systemImage: "arrow.clockwise")
+                    }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -57,13 +63,20 @@ struct ArticleView: View {
                 Button {
                     showComments = true
                 } label: {
-                    Label("\(entry.bookmarkCount)", systemImage: "bubble.left.and.text.bubble.right")
+                    Label(entry.bookmarkCount > 0 ? "\(entry.bookmarkCount)" : "ブコメ",
+                          systemImage: "bubble.left.and.text.bubble.right")
                         .labelStyle(.titleAndIcon)
                 }
                 Spacer()
-                Button(action: web.reload) { Image(systemName: "arrow.clockwise") }
-                Spacer()
                 ShareLink(item: web.url ?? entry.link) { Image(systemName: "square.and.arrow.up") }
+                Spacer()
+                Button {
+                    if let nextEntry { onNext(nextEntry) }
+                } label: {
+                    Label("次の記事", systemImage: "forward.end.fill")
+                        .labelStyle(.titleAndIcon)
+                }
+                .disabled(nextEntry == nil)
             }
         }
         .toolbar(.visible, for: .bottomBar)

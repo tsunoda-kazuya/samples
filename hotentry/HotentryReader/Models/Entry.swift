@@ -10,6 +10,11 @@ struct Entry: Identifiable, Hashable {
     let bookmarkCount: Int
     let imageURL: URL?
     let commentPageURL: URL?
+    /// まとめブログ等の配信元 (はてブのエントリは nil)
+    var sourceName: String? = nil
+    var sourceID: String? = nil
+
+    var isHatena: Bool { sourceID == nil }
 
     var domain: String {
         (link.host ?? "").replacingOccurrences(of: "www.", with: "")

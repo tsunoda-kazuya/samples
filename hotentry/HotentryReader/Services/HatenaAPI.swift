@@ -40,7 +40,37 @@ enum HatenaAPI {
         request.setValue("HotentryReader/1.0 (iOS)", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await session.data(for: request)
         try check(response)
-        return RSSParser.parse(data)
+        return FeedParser.parse(data).entries
+    }
+
+    /// まとめブログ等の RSS を取得 (https で失敗したら http で再試行)
+    static func fetchFeed(_ source: FeedSource) async throws -> [Entry] {
+        do {
+            return try await fetchFeedData(source.url, source: source)
+        } catch {
+            guard source.url.scheme == "https",
+                  var comps = URLComponents(url: source.url, resolvingAgainstBaseURL: false) else { throw error }
+            comps.scheme = "http"
+            guard let httpURL = comps.url else { throw error }
+            return try await fetchFeedData(httpURL, source: source)
+        }
+    }
+
+    /// フィード URL を検証してタイトルを返す (サイト追加用)
+    static func probeFeed(_ url: URL) async throws -> (title: String?, count: Int) {
+        let (data, response) = try await session.data(from: url)
+        try check(response)
+        let result = FeedParser.parse(data)
+        guard !result.entries.isEmpty else { throw URLError(.cannotParseResponse) }
+        return (result.title, result.entries.count)
+    }
+
+    private static func fetchFeedData(_ url: URL, source: FeedSource) async throws -> [Entry] {
+        let (data, response) = try await session.data(from: url)
+        try check(response)
+        let entries = FeedParser.parse(data, source: source).entries
+        if entries.isEmpty { throw URLError(.cannotParseResponse) }
+        return entries
     }
 
     /// ブックマークコメント一覧 (新しい順)

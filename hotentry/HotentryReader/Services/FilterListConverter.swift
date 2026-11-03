@@ -54,10 +54,26 @@ enum FilterListConverter {
         var domainSelectors: [String: [String]] = [:]   // "a.com,b.com" -> selectors
         var domainSelectorOrder: [String] = []
         var seenNetwork = Set<String>()
+        // #@# 要素非表示の例外: selector -> 例外ドメイン (空配列 = 全サイトで例外)
+        var hidingExceptionDomains: [String: [String]] = [:]
 
         for raw in text.split(whereSeparator: \.isNewline) {
             let line = raw.trimmingCharacters(in: .whitespaces)
             if line.isEmpty || line.hasPrefix("!") || line.hasPrefix("[") { continue }
+
+            // 要素非表示の例外 (example.com#@#.ad → example.com では .ad を隠さない)
+            if let range = line.range(of: "#@#") {
+                let selector = String(line[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+                let domainPart = String(line[..<range.lowerBound])
+                guard isSupportedSelector(selector) else { result.skipped += 1; continue }
+                if domainPart.isEmpty {
+                    hidingExceptionDomains[selector] = []
+                } else if hidingExceptionDomains[selector] != [] {
+                    let (include, _) = parseDomains(domainPart, separator: ",")
+                    hidingExceptionDomains[selector, default: []] += include
+                }
+                continue
+            }
 
             // WebKit で扱えない拡張構文
             if unsupportedMarkers.contains(where: { line.contains($0) }) {
@@ -103,6 +119,17 @@ enum FilterListConverter {
             case .hidingException(let rule):
                 result.hidingExceptions.append(rule)
             }
+        }
+
+        // 例外のある汎用セレクタは「例外ドメイン以外で隠す」個別ルールにする
+        genericSelectors = genericSelectors.filter { selector in
+            guard let domains = hidingExceptionDomains[selector] else { return true }
+            if !domains.isEmpty {
+                var trigger = ContentRule.Trigger(urlFilter: ".*")
+                trigger.unlessDomain = Array(Set(domains)).sorted().map { "*" + $0 }
+                result.hiding.append(.init(trigger: trigger, action: .init(type: "css-display-none", selector: selector)))
+            }
+            return false   // 全サイト例外なら完全に除外
         }
 
         // 汎用セレクタはまとめて 1 ルールに (多すぎると遅いので 250 件ずつ)
@@ -262,7 +289,7 @@ enum FilterListConverter {
     // MARK: - Helpers
 
     private static let unsupportedMarkers = [
-        "#@#", "#?#", "#$#", "#%#", "#@$#", "#@?#", "#@%#", "##+js", "##^", "$$", "$@$", "#+js",
+        "#?#", "#$#", "#%#", "#@$#", "#@?#", "#@%#", "##+js", "##^", "$$", "$@$", "#+js",
     ]
 
     private static let unsupportedSelectorParts = [

@@ -4,7 +4,7 @@ import SwiftUI
 struct HotentryReaderApp: App {
     var body: some Scene {
         WindowGroup {
-            EntryListView()
+            RootView()
                 .task { await FilterListManager.shared.updateIfNeeded() }
         }
     }
